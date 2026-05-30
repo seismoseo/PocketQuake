@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pocketquake"
-version = "0.1.0"
+dynamic = ["version"]            # read from pocketquake.__version__ (see [tool.setuptools.dynamic])
 description = "From an event-catalog CSV to a relocation-summary notebook in one command — glues seismoseo/necis-downloader (KMA waveform downloader) and seismoseo/korea-cluster-relocation (HypoDD + focal-mechanism pipeline)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,6 +38,9 @@ pocketquake = "pocketquake.orchestrate:main"
 Homepage = "https://github.com/seismoseo/PocketQuake"
 "NECIS downloader" = "https://github.com/seismoseo/necis-downloader"
 "Cluster pipeline" = "https://github.com/seismoseo/korea-cluster-relocation"
+
+[tool.setuptools.dynamic]
+version = {attr = "pocketquake.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["pocketquake*"]
