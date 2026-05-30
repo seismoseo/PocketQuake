@@ -6,6 +6,10 @@ the three M1.4–1.6 aftershocks followed in the next ~38 hours. Small enough to
 PocketQuake chain in roughly 15 minutes wall-clock, dense enough to exercise every stage —
 this is the recommended first example after you finish the install.
 
+![Chungju locations + focal mechanisms](figures/01_map_mechanisms.png)
+
+*Four located events (dots, colored by depth) at (37.142°N, 127.760°E) with high-confidence focal-mechanism beachballs (A/B/C grade labelled) drawn on a leader-line ring so the tight cluster stays legible. All four solutions converge on a near-vertical N–S right-lateral strike-slip plane — the headline result from one PocketQuake command.*
+
 ## The input catalog
 
 [`chungju_catalog.csv`](chungju_catalog.csv):
@@ -57,11 +61,22 @@ All 4 events converge on (37.142, 127.760), depths 7.3 – 10.2 km, RMS 0.22 –
 0.2 km, **all grade B**. The M3.1 mainshock depth (~10 km) is sensitive to the velocity model
 choice — switch to `--velmodels kim2011` to see how a one-extra-layer model adjusts it.
 
+![Distance record section for the M3.1 mainshock](figures/06_record_section_M31.png)
+
+*Z-component traces for the M3.1 mainshock, ordered by hypocentral distance, with PhaseNet+ picks overlaid (red = P, blue = S). The dashed lines are the predicted moveouts at the **depth-averaged Vp/Vs of the kim1983 model down to the event focal depth** — the picks fall right on the prediction, which is exactly the visual QC PocketQuake gives you for free per event.*
+
 ### Relative relocations (dt.cc HypoDD)
 
 The four events tighten to **±100 m** around (37.142, 127.759, 7.2 km depth). 479 dt.ct
 entries from ph2dt and 6 event pairs × 72 stations of waveform cross-correlation feed the
 relocation; the bootstrap error bars (95 % CI) are sub-100 m horizontal and ~300 m vertical.
+
+![Catalog map (dt.cc reloc) + depth sections](figures/02_map_reloc.png)
+![Depth sections](figures/03_depth_sections.png)
+
+![Fault-coordinate sections](figures/07_fault_sections.png)
+
+*The dt.cc relocated cloud rotated into the **best-fit fault frame** (SVD of the relocated cloud): fault-plane map view (top-left, with strike + dip + the high-magnitude event's beachball annotation), along-strike depth section (top-right), across-strike depth section (bottom-left, dashed line = dip), and the along-dip fault-plane view (bottom-right). Markers are coloured by origin time and sized by magnitude.*
 
 ### Focal mechanisms (SKHASH)
 
@@ -93,6 +108,16 @@ Each event's beachball overlays:
 
 This replaces the old static SKHASH PNG: same nodal planes, but you can now see why each
 quality grade was assigned (the misfit % is right there in the marker pattern).
+
+![All 4 chungju beachballs with polarity + S-P overlays](figures/04_beachball_gallery.png)
+
+*Each panel: nodal planes (gray = compressional first motion expected), triangles at each station's (azimuth, takeoff) position, colored circles for the S/P amplitude ratio. **M3.1, M1.4, M1.5 are grade A/B/A — almost every triangle lies in the expected quadrant** (polarity misfit 2.8–15.5 %). **M1.6 is grade C with 13.5 % polarity misfit** — visibly off-quadrant red triangles near N in the white quadrant tell you why the SKHASH inversion couldn't single out one plane.*
+
+The M3.1 mainshock in detail:
+
+![M3.1 mainshock detail](figures/05_beachball_M31_detail.png)
+
+*68 polarities (33 up, 35 down) and 70 S/P amplitude ratios, all consistent with a near-vertical N–S right-lateral plane (strike 204°, dip 87°, rake -180°). Polarity misfit 2.8 % is the lowest in the cluster — this is the SKHASH grade-A reference solution.*
 
 ## Files in this directory
 

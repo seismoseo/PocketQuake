@@ -2,6 +2,10 @@
 
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
+![Chungju Feb 2025 — PocketQuake output: 4 located events + focal mechanisms](examples/chungju/figures/01_map_mechanisms.png)
+
+*The PocketQuake output for the 4-event [Chungju Feb 2025 sequence](examples/chungju/README.md) — located events (depth-coloured dots) and SKHASH focal-mechanism beachballs (A/B/C grades) on a leader-line ring. All four solutions converge on a near-vertical N–S right-lateral strike-slip plane. **One command from a 4-line CSV to this figure: `./pocketquake.sh examples/chungju/chungju_catalog.csv chungju --fg`** (~15 min wall-clock).*
+
 PocketQuake glues two existing projects:
 
 - **[seismoseo/necis-downloader](https://github.com/seismoseo/necis-downloader)** — downloads KMA NECIS waveforms for a given event list.
@@ -87,6 +91,29 @@ pocketquake examples/changnyeong/changnyeong_catalog.csv \
 `pocketquake.sh` is the friendly one-liner; it auto-derives the epicenter (catalog centroid)
 and region bounds (catalog bbox + 0.2°), checks credentials, and chains the optional
 Gwangyang-style mainshock treatment when you pass `--mainshock UTC_YYYYMMDDHHMMSS`.
+
+## Gallery — what the notebook actually shows
+
+These figures all come straight out of `03_results_chungju.ipynb` (no manual editing) — the full
+catalog walkthrough is at [examples/chungju/README.md](examples/chungju/README.md).
+
+**Per-event focal mechanisms with polarity + S/P overlays (v1.0.0):**
+
+![Chungju beachball gallery with polarity + S-P overlays](examples/chungju/figures/04_beachball_gallery.png)
+
+*Each panel = one event. Red ▲ = upward first motion, blue ▼ = downward (size ∝ polarity weight, position = (azimuth, takeoff) on the lower hemisphere). Offset colored circles = log₁₀(S/P amplitude ratio). The M3.1 grade-A mainshock (top-left) has 2.8 % polarity misfit — almost every triangle on the predicted side. The M1.6 grade-C event (bottom-right) has 13.5 % misfit — the off-quadrant triangles tell you exactly which stations the inversion can't fit.*
+
+**Distance record section — picks vs depth-averaged moveout:**
+
+![Distance record section for the M3.1 mainshock](examples/chungju/figures/06_record_section_M31.png)
+
+*60 Z-component traces for the M3.1 mainshock, ordered by hypocentral distance. PhaseNet+ picks (red = P, blue = S) overlaid on the predicted moveouts at the kim1983 model's depth-averaged Vp/Vs down to the event focal depth. The picks lie right on the dashed lines — this is what PocketQuake's "your picks are good" QC looks like, automatically generated for every event.*
+
+**Fault-coordinate sections (best-fit plane of the relocated cloud):**
+
+![Chungju fault-coordinate sections](examples/chungju/figures/07_fault_sections.png)
+
+*The dt.cc relocated cloud rotated into the SVD best-fit fault frame: fault-plane map view, along-strike depth section, across-strike depth section (dashed dip line), and the along-dip view. Markers coloured by origin time, sized by magnitude.*
 
 That single command:
 
