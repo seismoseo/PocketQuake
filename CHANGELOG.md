@@ -3,6 +3,35 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 0.5.5 — 2026-05-30
+
+Changnyeong mainshock-treatment notebook regenerated against the v0.5.3 CRH-fix baseline. The
+pre-v0.5.3 `03_results_changnyeong_main.ipynb` was generated when HypoInverse was running with
+no velocity model (the dangling-CRH bug), so its mechanisms.csv lat/lon for the M2.6 mainshock
+read (35.5392, 128.4728, 10.04 km) — the same off-by-9 km artifact the default notebook also
+had until 0.5.3. This release also refreshes `mechanisms.csv` itself, which had been stuck on
+the pre-0.5.3 SKHASH output (the v0.5.3+ pipeline never re-ran the focal_mechanism stage for
+changnyeong).
+
+**Regenerated**
+- `pipeline/runs/changnyeong/3.FocalMech/kim1983/mechanisms.csv` — now reads correct
+  HypoInverse-locations (35.4626 / 128.4293 / 14.26 km for the M2.6) from the post-CRH-fix
+  `.sum`. 3 events, **3 high-confidence (grade A+B)**: M2.6 grade A (strike 191.6 / dip 86.9 /
+  rake -178.5 — near-vertical strike-slip), the two aftershocks grade B with the conjugate
+  geometry the cluster's tight cloud predicts.
+- `pipeline/notebooks/03_results_changnyeong.ipynb` (30 cells, 0 errors).
+- `pipeline/notebooks/03_results_changnyeong_main.ipynb` (31 cells, 0 errors). Includes a
+  prepended markdown cell explaining the treatment, and references the new
+  `hypoDD.reloc.untreated` snapshot for direct before/after comparison.
+
+**Snapshotted**
+- `pipeline/runs/changnyeong/2.HypoDD/02.dt.cc/hypoDD.reloc.untreated` — dt.cc relocation
+  produced with default ±0.5 s / 5–20 Hz xcorr windows across **all** pairs (xcorr_pair_overrides
+  temporarily stripped from `changnyeong.py`, then restored). The treated vs untreated
+  comparison shows sub-10 m horizontal differences per event for this tight 3-event cloud — the
+  mainshock treatment matters less for absolute positions here than for fault-plane direction
+  consistency.
+
 ## 0.5.4 — 2026-05-30
 
 Two follow-ups after v0.5.3.
