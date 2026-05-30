@@ -82,7 +82,20 @@ Each stage's output goes under `external/korea-cluster-relocation/pipeline/runs/
 - `station_table/used_stations_100km.csv` — stations within 100 km of the epicenter that had usable data.
 - `waveforms_100km/<event_id>/<event_id>.<net>.<code>.<sensor><comp>.sac` — 3-component per event, headers populated.
 - `picks/<event_id>_picks.csv` — PhaseNet+ picks with first-motion **Polarity** and **Amplitude** columns.
-- `1.HypoInv/kim2011/Changnyeong.sum`/`.arc`/`.prt` — absolute locations (HYPOINVERSE).
+- `1.HypoInv/` — absolute locations (HYPOINVERSE):
+  - `PHS/<Region>.phs` — phase file fed to `hyp1.40` (COP3 format, picks from SAC `a`/`t0`).
+  - `STA/<Region>_hyp.sta` — station table fed to `hyp1.40`.
+  - `kim1983/<Region>.{sum,arc,prt}` and `kim2011/<Region>.{sum,arc,prt}` — one location run per
+    velocity model. `.sum` is the headline (one line per event: lat / lon / depth / RMS / ERH /
+    grade), `.arc` is the per-station residual archive, `.prt` is the verbose iteration log
+    (read this if locations look wrong — the first `SEQUENCE` block shows the initial trial,
+    per-iteration `DLAT`/`DLON` reveal a singular Jacobian, and the `*** ERROR - CRUST FILE
+    DOES NOT EXIST` line surfaces if the velocity model failed to load).
+  - `kim1983/{kim1983_p,kim1983_s}.crh` — the velocity model `hyp1.40` actually ran with. If
+    `<Cluster>_cluster/1.HypoInv/kim1983/` has its own hand-curated `.crh` files, these are
+    symlinks pointing there; otherwise PocketQuake writes them from `ClusterConfig.velocity_models`
+    rows. (Fixed in 0.5.3 — earlier versions left broken symlinks here when the source dir was
+    empty, so `hyp1.40` ran with no velocity model.)
 - `2.HypoDD/02.dt.cc/hypoDD.reloc` — relative-relocation product.
 - `3.FocalMech/kim2011/{mechanisms.csv, beachballs/*.png}` — SKHASH double-couple solutions.
 

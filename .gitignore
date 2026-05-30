@@ -31,3 +31,6 @@ data/
 .vscode/
 .idea/
 .DS_Store
+
+# scratch run logs
+*_run.log

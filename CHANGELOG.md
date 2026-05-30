@@ -3,6 +3,52 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 0.5.3 — 2026-05-30
+
+The big one. Chungju never relocated end-to-end in 0.5.0–0.5.2; changnyeong's "v0.5.0 baseline"
+locations (35.5432 / 128.4868 / 10.2 km) also turned out to be wrong. Both clusters were running
+hyp1.40 with **no velocity model** — `pipeline/core/hypoinverse.py:_provision_crh` was creating
+broken symlinks to `<Cluster>_cluster/1.HypoInv/<model>/<model>_{p,s}.crh`, a directory PocketQuake's
+scaffold never populated. hyp1.40 printed `*** ERROR - CRUST FILE DOES NOT EXIST` and silently fell
+through with a built-in default. Changnyeong's well-distributed network made the locations
+*look* plausible (off by 9 km from catalog 35.46 / 128.43 / 14–16 km, not enough to raise alarms);
+chungju's tighter geometry exposed it — AGSA at 6.9 km from epicenter became the "closest station
+to first P arrival" hyp1.40 falls back to for trial location, the (lat, lon) Jacobian collapsed
+because the velocity model wasn't constraining anything, and DLAT = DLON = 0 in every iteration
+([chungju/1.HypoInv/kim1983/Chungju.prt:56-78](external/korea-cluster-relocation/pipeline/runs/chungju/1.HypoInv/kim1983/Chungju.prt)).
+
+**Fixed**
+- `pipeline/core/hypoinverse.py:_provision_crh` now checks whether the source CRH file actually
+  exists before symlinking, and falls back to writing the CRH from the in-config `p_rows` /
+  `s_rows` when it doesn't. Local working-tree edit in the eq-cycle submodule.
+- `pipeline/viz.py:plot_record_section` auto-fits `ylim` to the actual data range (was fixed to
+  `(0, max_h * 1.05)` so deep / sparse-near-field clusters showed huge empty top and bottom);
+  per-trace `dscale` now sizes to the median inter-station gap instead of `0.04 * max_h` so
+  adjacent traces don't overlap on clusters where the gap is ~1–3 km but the max distance is ~100 km.
+
+**Verified**
+- **chungju** (the canary, finally end-to-end): all 4 events relocate at HypoInverse to
+  (37.1427, 127.7596–127.7602), depths 6.85–7.31 km, RMS 0.16–0.20 s, ERH 0.1–0.2 km, all
+  grade B — matches catalog (37.14, 127.76, depths 6–9 km) within ±300 m horizontally. ph2dt
+  produces 479 `dt.ct` entries (was 0 before). dt.cc converges to a tight cluster at
+  (37.142, 127.759, ~7.2 km depth) with ±100 m spread. Notebook 30 cells, 0 errors.
+- **changnyeong**: re-located on the now-correct kim1983 model. New .sum: 35.4626 / 128.4293 /
+  14.26 km (event 1), matching the user's catalog (35.46 / 128.43 / 14–16 km) within ±0.001°.
+  Previous v0.5.0–0.5.2 .sum (35.5432 / 128.4868 / 10.2 km) is **superseded** — it was the
+  no-velocity-model default. dt.cc reloc + focal mechanism re-computed on the corrected
+  baseline. ~302 P picks across 3 events with the `--stage-from waveforms` re-run.
+- **No regression on the source clusters** (gwangyang / jangsung / kimcheon / gyeongju): those
+  source-roots have their own hand-curated `1.HypoInv/<model>/*.crh` files, so
+  `_provision_crh` still symlinks the same way it did before — byte-identical inputs and
+  outputs.
+
+**Notes**
+- The `--stage-from picking` partial-rerun gotcha (picking on already-rereferenced SACs drops
+  close-station P arrivals because SAC `nz*` headers were shifted by an earlier rereference)
+  remains a pipeline subtlety — use `--stage-from waveforms` for a full re-pick.
+- Documentation: HypoInverse output paths now listed explicitly in `docs/workflow.md` and the
+  README's "What you get" section so users know where to look when a relocation looks wrong.
+
 ## 0.5.2 — 2026-05-30
 
 `plot_record_section` was temporally mis-aligned in v0.5.1 — the y-axis used **epicentral** distance
