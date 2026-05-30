@@ -3,6 +3,33 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 0.5.4 — 2026-05-30
+
+Two follow-ups after v0.5.3.
+
+**Added**
+- `pipeline/runs/chungju/3.FocalMech/kim1983/mechanisms.csv` — chungju's focal-mechanism stage
+  now runs end-to-end (previously the notebook reported "no mechanisms.csv yet"). 4 events,
+  3 high-confidence (grade A/B) solutions, all showing consistent strike-slip on a near-vertical
+  ~N-S striking fault (strike 187–207°, dip 83–88°, rake ±180°). Event 200003 (M1.6, the smallest)
+  gets two grade C/D solutions because of fewer usable picks.
+
+**Changed**
+- `pipeline/viz.py:plot_record_section` — the predicted P/S moveout lines now use the
+  **depth-averaged vertical velocity through the HypoInverse velocity model** (`cfg.fm_velmodel`,
+  default `kim1983`), integrated from the surface down to the event's catalog depth, rather than
+  the fixed `cfg.pick_window["vp"]=5.9 / vs=3.0`. Still a single straight line per phase
+  (constant velocity), now consistent with the model that produced the absolute locations.
+  Examples: chungju at 7 km depth — Vp = 5.98, Vs = 3.40 (within kim1983's first layer);
+  events at 20 km — Vp = 6.08 (mixed first + second layer). The picking-window scheme is
+  **unchanged** — picking still reads `cfg.pick_window["vp"]/["vs"]`.
+
+**Verified**
+- chungju: notebook regenerated; record-section moveouts now labelled `kim1983 avg to 7.3 km`
+  (Vp 5.98, Vs 3.40), mechanisms panel populated.
+- changnyeong: notebook regenerated; moveouts at 14–16 km depth (still within kim1983 first
+  layer) render at Vp 5.98 / Vs 3.40 — visually nearly identical to v0.5.3 (which used 5.9/3.0).
+
 ## 0.5.3 — 2026-05-30
 
 The big one. Chungju never relocated end-to-end in 0.5.0–0.5.2; changnyeong's "v0.5.0 baseline"
