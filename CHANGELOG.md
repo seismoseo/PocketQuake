@@ -3,6 +3,40 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 0.5.2 — 2026-05-30
+
+`plot_record_section` was temporally mis-aligned in v0.5.1 — the y-axis used **epicentral** distance
+(`sac.dist`) but the overlaid moveout line was drawn at `t = epi / V`, which ignores the focal-depth
+contribution to slant distance. For shallow events at close stations, hypocentral can be ~2× the
+epicentral, so the picks landed visibly to the right of the (wrongly-drawn) moveout line — looking
+"wrong" even when they were correct. Fixed by mirroring the Ridgecrest reference implementation at
+`12.Ridgecrest/scripts/02_phase_picking.py:894, 1296`.
+
+**Fixed**
+- `pipeline.viz.plot_record_section` now uses **hypocentral distance** for both the y-axis and the
+  predicted moveout: `hypo = sqrt(epi² + evdp²)`, where `evdp` is the **per-event catalog depth**
+  (via `pipeline.core.waveforms.load_catalog`), falling back to `cfg.pick_window["evdp"]`.
+- Origin-relative time axis computed Ridgecrest-style: `origin_abs = starttime − sac.b + sac.o`,
+  `t_rel = tr.times() + (starttime − origin_abs)`. Picks from the CSV are subtracted by the same
+  per-station `origin_abs`, so absolute UTC pick times align with the trace times even after the
+  `rereference` stage has shifted the SAC reference (`nz*`).
+- Predicted-moveout lines now start at `hypo = evdp` (the closest a station can be in slant range),
+  not at zero — a station directly above the source has hypocentral distance = depth, not 0.
+- Title now annotates `depth = X km` so the reader knows which depth was used.
+
+**Added**
+- `03_results_chungju.ipynb` ships as a worked example: same builder, but with the dt.cc / focal-
+  mechanism / fault-frame sections gracefully empty (chungju's pipeline crashes at dtct on the v0.5.1
+  HypControl issue — separate fix; the notebook still shows locations + picks + record sections so
+  you can see what a "what does the QC look like before per-cluster HypControl tuning" looks like).
+
+**Verified**
+- changnyeong: notebook regenerated; the closest-station predicted P moveout moved from `epi/Vp` to
+  `hypo/Vp` (factor 1.6× at the closest station), and the picks now sit on the dashed line.
+- chungju: AGSA (epi 6.85 km, depth 7 km, hypo 9.79 km) predicted P = 1.66 s; the actual pick at
+  +2.48 s now reads as a clean +0.8 s residual (consistent with the +1 s origin-time offset seen
+  across all chungju events), where v0.5.1 showed it as +1.3 s — same data, correctly aligned.
+
 ## 0.5.1 — 2026-05-30
 
 Picking-window fix + distance-record-section QC. Driven by the **chungju self-test** revealing that the

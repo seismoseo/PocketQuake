@@ -153,36 +153,44 @@ The table is one row per event (best quality kept) and lists **both nodal planes
 of the two. `map_mechanisms` shows the **locations and focal mechanisms together**: located
 epicenters as depth-coloured dots, with the high-confidence (quality A/B) beachballs offset on a
 ring around the cluster (leader line to each true epicenter) so a tight cluster stays legible.""")
-co(r"""tbl = viz.mechanism_table(cfg, VELMODEL)
-display(tbl)
-viz.map_mechanisms(cfg, VELMODEL); plt.show()""")
-co(r"""# per-event beachball gallery (SKHASH plots) for the high-confidence events
-from matplotlib import image as mpimg
-mech = pd.read_csv(config.fm_mech_csv(cfg, VELMODEL)).drop_duplicates("event_id")
-e2c  = dict(zip(mech.event_id.astype(str), mech.cuspid.astype(int)))
-# prefer the high-confidence (A/B) events; if none (e.g. coverage-limited clusters), show the
-# best-graded events anyway so the (low-confidence) mechanisms are still visible
-hi   = tbl[tbl.quality.isin(cfg.fm_quality_keep)] if len(tbl) else tbl
-sel  = (hi if len(hi) else tbl.sort_values("quality")).head(9)
-ids  = list(sel.event_id.astype(str))
-out  = config.fm_out_dir(cfg, VELMODEL)
-if ids:
-    ncol = min(3, len(ids)); nrow = (len(ids) + ncol - 1) // ncol
-    fig, axes = plt.subplots(nrow, ncol, figsize=(3.6 * ncol, 3.8 * nrow), squeeze=False)
-    for ax in axes.ravel():
-        ax.axis("off")
-    for ax, eid in zip(axes.ravel(), ids):
-        r = sel[sel.event_id.astype(str) == eid].iloc[0]
-        png = os.path.join(out, f"{e2c.get(eid)}.png")
-        if os.path.exists(png):
-            ax.imshow(mpimg.imread(png))
-        ax.set_title(f"{eid}   {r.quality}\ns/d/r = {r.strike:.0f}/{r.dip:.0f}/{r.rake:.0f}",
-                     fontsize=9)
-    fig.suptitle(f"{cfg.region} — high-confidence focal mechanisms (SKHASH beachballs)", fontsize=11)
-    plt.tight_layout(); plt.show()
+co(r"""# guard: focal_mechanism stage may not have run (e.g. ph2dt failed upstream)
+_FM_OK = os.path.exists(config.fm_mech_csv(cfg, VELMODEL))
+tbl = viz.mechanism_table(cfg, VELMODEL) if _FM_OK else pd.DataFrame()
+if not _FM_OK:
+    print(f"(no mechanisms.csv yet — run the focal_mechanism stage for {CLUSTER} with picker_weights='phasenet_plus')")
 else:
-    print("No high-confidence (A/B) mechanisms for this run "
-          "(needs a phasenet_plus focal_mechanism run).")""")
+    display(tbl)
+    viz.map_mechanisms(cfg, VELMODEL); plt.show()""")
+co(r"""# per-event beachball gallery (SKHASH plots) for the high-confidence events
+if not _FM_OK:
+    print("(no mechanisms.csv — skipping beachball gallery)")
+else:
+ from matplotlib import image as mpimg
+ mech = pd.read_csv(config.fm_mech_csv(cfg, VELMODEL)).drop_duplicates("event_id")
+ e2c  = dict(zip(mech.event_id.astype(str), mech.cuspid.astype(int)))
+ # prefer the high-confidence (A/B) events; if none (e.g. coverage-limited clusters), show the
+ # best-graded events anyway so the (low-confidence) mechanisms are still visible
+ hi   = tbl[tbl.quality.isin(cfg.fm_quality_keep)] if len(tbl) else tbl
+ sel  = (hi if len(hi) else tbl.sort_values("quality")).head(9)
+ ids  = list(sel.event_id.astype(str))
+ out  = config.fm_out_dir(cfg, VELMODEL)
+ if ids:
+     ncol = min(3, len(ids)); nrow = (len(ids) + ncol - 1) // ncol
+     fig, axes = plt.subplots(nrow, ncol, figsize=(3.6 * ncol, 3.8 * nrow), squeeze=False)
+     for ax in axes.ravel():
+         ax.axis("off")
+     for ax, eid in zip(axes.ravel(), ids):
+         r = sel[sel.event_id.astype(str) == eid].iloc[0]
+         png = os.path.join(out, f"{e2c.get(eid)}.png")
+         if os.path.exists(png):
+             ax.imshow(mpimg.imread(png))
+         ax.set_title(f"{eid}   {r.quality}\ns/d/r = {r.strike:.0f}/{r.dip:.0f}/{r.rake:.0f}",
+                      fontsize=9)
+     fig.suptitle(f"{cfg.region} — high-confidence focal mechanisms (SKHASH beachballs)", fontsize=11)
+     plt.tight_layout(); plt.show()
+ else:
+     print("No high-confidence (A/B) mechanisms for this run "
+           "(needs a phasenet_plus focal_mechanism run).")""")
 
 md("""## 4. Seismicity in fault coordinates
 
