@@ -1,0 +1,272 @@
+import nbformat as nbf
+nb = nbf.v4.new_notebook(); C = []
+def md(s): C.append(nbf.v4.new_markdown_cell(s))
+def co(s): C.append(nbf.v4.new_code_cell(s))
+
+md(r"""# Cluster results — locations and focal mechanisms
+
+A single, cluster-parameterized notebook to view a cluster's **located catalog** and its
+**focal mechanisms together**. Set the params below and run top to bottom.
+
+Focal mechanisms require a **phasenet_plus** run (the PhaseNet+ picker emits first-motion polarity
++ S/P amplitude that SKHASH needs); point `RUN_SUFFIX` at that run's output tree. Locations alone
+work for any picker.""")
+
+co(r"""%matplotlib inline
+import os, sys
+# Assumes the notebook runs from pipeline/notebooks/ ; otherwise set PYTHONPATH=<repo root>.
+sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..", "..")))
+import pandas as pd
+import matplotlib.pyplot as plt
+from IPython.display import display
+
+from pipeline import config, viz
+
+# ------------------------------- PARAMS (edit & re-run) -------------------------------
+CLUSTER    = "gwangyang"        # gwangyang | kimcheon | jangsung | gyeongju
+RUN_SUFFIX = "_pnplus"          # output tree = runs/<cluster><suffix>; "" = the default run
+VELMODEL   = "kim1983"          # velocity model whose .sum / mechanisms to show
+N_BOOT     = 1000               # bootstrap replicas for the 95% location error bars (cached)
+BOOT_SEED  = 0                  # bootstrap RNG seed (reproducible)
+
+cfg0 = config.load_cluster(CLUSTER)
+cfg  = config.tune(cfg0, output_root=os.path.join(config.RUNS_ROOT, f"{CLUSTER}{RUN_SUFFIX}")) \
+       if RUN_SUFFIX else cfg0
+print(f"{cfg.region}: outputs -> {cfg.output_root}")""")
+
+md("""## 1. Locations
+
+Three location stages, each with fewer events than the last: **`.sum`** is every event HYPOINVERSE
+locates absolutely; **dt.ct** is the HypoDD catalog relocation, which keeps only events with enough
+catalog differential-time links (isolated events drop); **dt.cc** is the HypoDD cross-correlation
+relocation, which further keeps only events whose waveforms correlate well. **dt.cc is the high-end
+product** (errors of metres vs tens of metres for dt.ct) and is the headline relocation below. Counts
+shrink `.sum ≥ dt.ct ≥ dt.cc` but not strictly — each HypoDD run re-clusters independently.""")
+co(r"""display(viz.relocation_counts(cfg, VELMODEL))""")
+md("""### Location uncertainty — bootstrap 95%
+
+HypoDD's own (LSQR a-posteriori) errors badly **underestimate** the true relative-location uncertainty.
+We instead estimate it by **bootstrapping the differential-time data** (`hypodd.bootstrap_relocation`):
+pool all dt observations, resample with replacement, regroup, and re-run HypoDD `N_BOOT` times with the
+inversion held fixed (the calibrated `hypoDD.inp`). Each replica is **seeded from the converged relocation**
+(so the bar measures the data-driven spread *around the solution*, not the ability to re-converge from a
+poor initial absolute location) and **median-aligned**; the per-event **2.5–97.5 percentile half-width** of
+the X/Y/Z scatter is the **95% error bar** drawn on every location / section / 3-D plot below (percentile,
+not σ — robust to the heavy tail of the global resample). It is cached + seeded (reproduces exactly; first
+run is slow, then instant). The plots also **drop events the bootstrap flags as under-constrained**
+(`viz._boot_underconstrained`) and note the count, and **circles scale by KMA local magnitude**.""")
+co(r"""from pipeline.core import hypodd, sumio
+import numpy as _np
+_rows = []
+for _lab, _br in (("dt.ct", "dtct"), ("dt.cc", "dtcc")):
+    _bdir = config.dtct_dir(cfg) if _br == "dtct" else config.dtcc_dir(cfg)
+    if not os.path.exists(os.path.join(_bdir, "hypoDD.reloc")):
+        continue
+    _bb = hypodd.bootstrap_relocation(cfg, branch=_br, n=N_BOOT, seed=BOOT_SEED)   # cached
+    _rl = sumio.read_reloc(os.path.join(_bdir, "hypoDD.reloc"))
+    _rows.append(dict(branch=_lab, events=len(_rl), n_with_CI=int(_bb.ex95.notna().sum()),
+                      ex95_boot_m=_np.nanmedian(_bb.ex95), ey95_boot_m=_np.nanmedian(_bb.ey95),
+                      ez95_boot_m=_np.nanmedian(_bb.ez95),
+                      ex_int_m=_rl.ex.median(), ey_int_m=_rl.ey.median(), ez_int_m=_rl.ez.median()))
+display(pd.DataFrame(_rows).round(1))
+print("Median 95% bootstrap half-widths (…_boot_m) vs HypoDD internal a-posteriori errors (…_int_m), metres.")""")
+md("""Per-event diagnostic — the dt.cc events with the largest 95% horizontal error, with their CC/CT link
+counts and `n_boot` (replicas where the event relocated). A large bar with **plenty of links** means the
+event is poorly *determined* (geometry — e.g. shallow + one-sided coverage), not poorly *measured*; such
+events are dropped from the plots below (`viz._boot_underconstrained`).""")
+co(r"""_bdir = config.dtcc_dir(cfg)
+if os.path.exists(os.path.join(_bdir, "hypoDD.reloc")):
+    _bb = hypodd.bootstrap_relocation(cfg, branch="dtcc", n=N_BOOT, seed=BOOT_SEED)
+    _rl = sumio.read_reloc(os.path.join(_bdir, "hypoDD.reloc"))[["id","nccp","nccs","nctp","ncts"]]
+    _t = _rl.merge(_bb[["id","n_boot","ex95","ey95","ez95"]], on="id")
+    _t["horiz95_m"] = _np.hypot(_t.ex95, _t.ey95)
+    _t["dropped"] = _t.id.isin(viz._boot_underconstrained(cfg, "dt.cc"))
+    display(_t.sort_values("horiz95_m", ascending=False).head(6).round(1).reset_index(drop=True))""")
+
+md("""### Final relocation table — locations + bootstrap 95% errors
+
+`viz.location_table` is the headline deliverable: one neat row per event with the dt.cc location
+(`latitude`/`longitude`/`depth_km`), KMA local `magnitude`, the bootstrap **95% half-widths**
+`ex95_m`/`ey95_m`/`ez95_m` (E/N/Z metres), `n_boot` (replicas the event relocated in), the HypoDD
+inter-event link counts (`cc_links`/`ct_links`), and an `under_constrained` flag (the bootstrap-flagged
+events the plots drop). It also writes **`final_locations.csv`** to the dt.cc run directory. Below it is
+styled for the notebook — error columns shaded (darker = larger), under-constrained rows tinted red.""")
+co(r"""loc = viz.location_table(cfg)                       # also writes <dt.cc dir>/final_locations.csv
+print(f"{len(loc)} events — written to final_locations.csv in the dt.cc run directory")
+_fmt = {c: "{:.1f}" for c in ("magnitude", "ex95_m", "ey95_m", "ez95_m")}
+_fmt.update({"latitude": "{:.5f}", "longitude": "{:.5f}", "depth_km": "{:.3f}"})
+_sty = (loc.style.format(_fmt, na_rep="—")
+        .background_gradient(subset=["ex95_m", "ey95_m", "ez95_m"], cmap="OrRd")
+        .apply(lambda r: ["background-color:#ffdede" if r.under_constrained else "" for _ in r], axis=1)
+        .set_caption("Final dt.cc relocation with bootstrap 95% errors (m); "
+                     "red rows = under-constrained (dropped from the plots)")) if len(loc) else None
+display(_sty if _sty is not None else "No dt.cc reloc for this run.")""")
+co(r"""viz.map_catalog(cfg, velmodel=VELMODEL, source="sum"); plt.show()
+viz.depth_sections(cfg, velmodel=VELMODEL, source="sum"); plt.show()
+viz.cumulative_events(cfg, velmodel=VELMODEL); plt.show()""")
+co(r"""# headline relocated catalog (dt.cc if present, else dt.ct)
+if os.path.exists(os.path.join(config.dtct_dir(cfg), "hypoDD.reloc")):
+    viz.map_catalog(cfg, velmodel=VELMODEL, source="reloc"); plt.show()
+    if os.path.exists(os.path.join(config.dtcc_dir(cfg), "hypoDD.reloc")):
+        viz.compare_epicenters(cfg, velmodel=VELMODEL); plt.show()   # dt.ct vs dt.cc
+else:
+    print("No HypoDD reloc for this run — showing absolute (.sum) locations only.")""")
+
+md("""## 2. Picks and first-motion polarity
+
+PhaseNet+ picks carry a first-motion **polarity** (up/down) — the input to the focal-mechanism inversion.
+`plot_3c` shows the three components with P (red) / S (blue) and the P polarity marked on the vertical;
+`plot_polarities` is a P-aligned first-motion record section sorted by azimuth (red = up, blue = down),
+i.e. the up/down-vs-azimuth pattern that constrains the mechanism.""")
+co(r"""# a representative event: the best-quality mechanism, else the first picks CSV
+import glob as _glob
+_tbl = viz.mechanism_table(cfg, VELMODEL)
+if len(_tbl):
+    SAMPLE_EVENT = str(_tbl.sort_values("quality").iloc[0].event_id)
+else:
+    _pf = sorted(_glob.glob(os.path.join(config.picks_dir(cfg), "*_picks.csv")))
+    SAMPLE_EVENT = os.path.basename(_pf[0]).split("_")[0] if _pf else None
+print("Sample event:", SAMPLE_EVENT)
+viz.plot_3c(cfg, SAMPLE_EVENT); plt.show()
+viz.plot_polarities(cfg, SAMPLE_EVENT); plt.show()""")
+
+md("""## 3. Focal mechanisms
+
+The table is one row per event (best quality kept) and lists **both nodal planes** —
+`strike/dip/rake` is the SKHASH-reported plane (NP1) and `strike2/dip2/rake2` its conjugate
+(NP2, via obspy `aux_plane`); a double-couple is fully described by either, and the fault is one
+of the two. `map_mechanisms` shows the **locations and focal mechanisms together**: located
+epicenters as depth-coloured dots, with the high-confidence (quality A/B) beachballs offset on a
+ring around the cluster (leader line to each true epicenter) so a tight cluster stays legible.""")
+co(r"""tbl = viz.mechanism_table(cfg, VELMODEL)
+display(tbl)
+viz.map_mechanisms(cfg, VELMODEL); plt.show()""")
+co(r"""# per-event beachball gallery (SKHASH plots) for the high-confidence events
+from matplotlib import image as mpimg
+mech = pd.read_csv(config.fm_mech_csv(cfg, VELMODEL)).drop_duplicates("event_id")
+e2c  = dict(zip(mech.event_id.astype(str), mech.cuspid.astype(int)))
+# prefer the high-confidence (A/B) events; if none (e.g. coverage-limited clusters), show the
+# best-graded events anyway so the (low-confidence) mechanisms are still visible
+hi   = tbl[tbl.quality.isin(cfg.fm_quality_keep)] if len(tbl) else tbl
+sel  = (hi if len(hi) else tbl.sort_values("quality")).head(9)
+ids  = list(sel.event_id.astype(str))
+out  = config.fm_out_dir(cfg, VELMODEL)
+if ids:
+    ncol = min(3, len(ids)); nrow = (len(ids) + ncol - 1) // ncol
+    fig, axes = plt.subplots(nrow, ncol, figsize=(3.6 * ncol, 3.8 * nrow), squeeze=False)
+    for ax in axes.ravel():
+        ax.axis("off")
+    for ax, eid in zip(axes.ravel(), ids):
+        r = sel[sel.event_id.astype(str) == eid].iloc[0]
+        png = os.path.join(out, f"{e2c.get(eid)}.png")
+        if os.path.exists(png):
+            ax.imshow(mpimg.imread(png))
+        ax.set_title(f"{eid}   {r.quality}\ns/d/r = {r.strike:.0f}/{r.dip:.0f}/{r.rake:.0f}",
+                     fontsize=9)
+    fig.suptitle(f"{cfg.region} — high-confidence focal mechanisms (SKHASH beachballs)", fontsize=11)
+    plt.tight_layout(); plt.show()
+else:
+    print("No high-confidence (A/B) mechanisms for this run "
+          "(needs a phasenet_plus focal_mechanism run).")""")
+
+md("""## 4. Seismicity in fault coordinates
+
+`fault_sections` rotates the dt.cc relocated catalog into the fault frame and shows four panels:
+a **fault-plane map view** (with the strike line, the perpendicular, and the focal-mechanism beachball),
+an **along-strike** depth section (A–A'), an **across-strike** depth section (B–B', dashed line = dip),
+and a **fault-plane (along-dip) view**. Markers are coloured by origin time (so migration is visible)
+and sized by magnitude. The orientation is the **best-fit plane of the relocated cloud** (data-driven,
+via SVD), with the focal mechanism overlaid only for comparison — pass `strike=`/`dip=` to override.
+A tight across-strike spread indicates a near-planar fault.""")
+co(r"""viz.fault_sections(cfg, VELMODEL); plt.show()""")
+
+md("""## 5. Seismicity in 3-D (interactive)
+
+`plot_3d_plane` returns an **interactive plotly** 3-D view of the dt.cc hypocentres (relative E–N–depth km,
+coloured by origin time, sized by magnitude) with the SVD best-fit fault plane overlaid as a translucent
+patch — rotate/zoom to judge planarity and dip. (Interactivity is live in a running notebook; committed
+notebooks are output-stripped, and a static export needs the optional `kaleido` package.)""")
+co(r"""fig3d = viz.plot_3d_plane(cfg, VELMODEL)
+try:                                  # optional static export (needs kaleido); harmless if absent
+    fig3d.write_image(f"/tmp/{CLUSTER}_3d.png", scale=2)
+except Exception as _e:
+    print("(static export skipped — install kaleido for a PNG; the figure is interactive in a live notebook)")
+fig3d                                 # <- interactive in JupyterLab: drag to rotate, scroll to zoom""")
+md("""The same view with the per-event uncertainty drawn as a **95% bootstrap error ellipsoid**
+(`error="ellipsoid"`) instead of whisker bars: each ellipsoid's shape is the bootstrap sample covariance
+and its size the empirical 95% Mahalanobis radius (95% of replicas inside), coloured like its hypocentre.
+Tight horizontal but loose depth control shows up as a vertically elongated ellipsoid.""")
+co(r"""fig3d_e = viz.plot_3d_plane(cfg, VELMODEL, error="ellipsoid")
+try:
+    fig3d_e.write_image(f"/tmp/{CLUSTER}_3d_ellipsoid.png", scale=2)
+except Exception:
+    pass
+fig3d_e""")
+
+md("""## 6. PhaseNet+ polarity quality — are the first motions trustworthy?
+
+The focal mechanisms rest on PhaseNet+ first-motion **polarities**, so it's worth asking how good they are.
+`polarity_quality` shows the polarity **confidence** (`|polarity|`) and pick-probability distributions, plus
+the SKHASH **polarity misfit** per event (the fraction of polarities inconsistent with the fitted
+double-couple — lower = more self-consistent). Where manual picks exist (Gwangyang), `polarity_vs_manual`
+compares the PhaseNet+ polarity sign to the first-motion sign read at the **manual** P pick, as a function of
+confidence (a ground-truth-free proxy: an analyst reads the raw first swing).""")
+co(r"""viz.polarity_quality(cfg, VELMODEL); plt.show()""")
+co(r"""viz.polarity_vs_manual(cfg); plt.show()   # Gwangyang: manual proxy; other clusters: graceful note""")
+md("""**Verdict (Gwangyang, the manual-pick cluster).** PhaseNet+ polarity agreement with the manual
+first-motion proxy rises monotonically with the model's own confidence — ~50% at `|pol|`<0.3 (coin-flip),
+~60% at 0.3–0.6, ~80% at `|pol|`≥0.6 (and the crude proxy makes 80% a *lower bound*). About **60% of P picks
+carry low confidence** (`|pol|`<0.5), while pick *timing* probability is high — i.e. PhaseNet+ is confident
+about *when* but often unsure about *up/down*. So the polarities are a **useful automated input for focal
+mechanisms when confidence-gated** (the pipeline already gates on `fm_min_pick_prob` and
+`fm_min_polarity_weight`), reproducing coherent A/B mechanisms (SKHASH misfit ~11–22%) — but they are **not a
+wholesale substitute for expert manual polarity picking**, especially for sparse / low-SNR events; the
+low-confidence picks should be down-weighted or excluded, not trusted blindly.""")
+
+md(r"""## 7. Interpretation
+
+- **Quality A/B** = well-constrained ("fairly high confidence"); C/D are under-constrained and shown
+  for context only. SKHASH grades on polarity misfit, station-distribution ratio, azimuthal/takeoff
+  gaps, and mechanism probability.
+- **Polarity** (vertical first motion) is the robust signal; the vertical-component **S/P ratio** is a
+  secondary enhancement (`cfg.fm_use_sp_ratio`). Re-run with `fm_use_sp_ratio=False` for a
+  polarity-only comparison.
+- Consistent beachballs across events indicate a coherent source process on a common fault geometry.
+- **Fault frame vs mechanism.** The section orientation is the relocation cloud's own best-fit plane,
+  and the focal mechanism is overlaid for comparison. When the two agree (e.g. Gwangyang, where the
+  best-fit strike ≈ the mechanism's nodal plane), the fault geometry is well determined. When they
+  disagree, read the section's strike/dip header: an under-constrained cluster (e.g. **Jangsung** — only
+  a few dt.cc events and a grade-D mechanism) still gets a data-driven fault frame, but the mechanism is
+  not reliable there, so the section is indicative only.
+- To regenerate: run `picking` (`--picker phasenet_plus`), `hypoinverse`, then the `focal_mechanism`
+  stage for this cluster (see the top-level README).""")
+
+import os, sys, argparse
+
+# Default destination: the eq-cycle submodule's notebooks dir, resolved relative to PocketQuake root
+# (this file lives at PocketQuake/pocketquake/build_results_nb.py).
+_PQ_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+_DEFAULT_OUT = os.path.join(_PQ_ROOT, "external", "korea-cluster-relocation",
+                            "pipeline", "notebooks")
+
+
+def build(cluster: str, out_dir: str = _DEFAULT_OUT) -> str:
+    """Write 03_results_<cluster>.ipynb under `out_dir` and return the path."""
+    for c in C:                                   # inject the cluster name into the PARAMS cell
+        if c.cell_type == "code" and 'CLUSTER    = "gwangyang"' in c.source:
+            c.source = c.source.replace('CLUSTER    = "gwangyang"', f'CLUSTER    = "{cluster}"')
+    nb["cells"] = C
+    nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"03_results_{cluster}.ipynb")
+    nbf.write(nb, path); print(f"wrote {path} ({len(C)} cells)")
+    return path
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Build the 03_results_<cluster>.ipynb notebook for the eq-cycle pipeline.")
+    ap.add_argument("cluster", help="cluster name (e.g. changnyeong)")
+    ap.add_argument("--out-dir", default=_DEFAULT_OUT,
+                    help=f"target directory (default: {_DEFAULT_OUT})")
+    a = ap.parse_args()
+    build(a.cluster, a.out_dir)

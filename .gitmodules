@@ -1,0 +1,6 @@
+[submodule "external/necis-downloader"]
+	path = external/necis-downloader
+	url = git@github.com:seismoseo/necis-downloader.git
+[submodule "external/korea-cluster-relocation"]
+	path = external/korea-cluster-relocation
+	url = git@github.com:seismoseo/korea-cluster-relocation.git

@@ -1,0 +1,33 @@
+# PocketQuake gitignore
+
+# Credentials
+.env
+
+# Build / install artifacts
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Generated runs / data (lives under external/korea-cluster-relocation/runs/ + the cluster src_roots)
+external/korea-cluster-relocation/runs/
+external/korea-cluster-relocation/*/kma_waveforms/
+external/korea-cluster-relocation/*/event_catalog/
+external/korea-cluster-relocation/*/station_table/
+external/korea-cluster-relocation/pipeline/clusters/_*generated*.py
+external/korea-cluster-relocation/pipeline/notebooks/03_results_*.ipynb
+
+# Local NECIS staging (orchestrate writes into the cluster src_root, but leave a safety net)
+data/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

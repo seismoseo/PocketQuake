@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pocketquake"
+version = "0.1.0"
+description = "From an event-catalog CSV to a relocation-summary notebook in one command — glues seismoseo/necis-downloader (KMA waveform downloader) and seismoseo/korea-cluster-relocation (HypoDD + focal-mechanism pipeline)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Min-Seong Seo (seismoseo)" },
+]
+keywords = ["seismology", "earthquake", "relocation", "HypoDD", "KMA", "NECIS"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    # PocketQuake itself is a thin orchestrator — the heavy deps live in the submodules.
+    # NECIS downloader (external/necis-downloader) brings Playwright, requests, pandas.
+    # eq-cycle (external/korea-cluster-relocation) brings obspy, seisbench, plotly, etc.
+    "pandas>=2.0",
+    "nbformat>=5.7",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+]
+
+[project.scripts]
+pocketquake = "pocketquake.orchestrate:main"
+
+[project.urls]
+Homepage = "https://github.com/seismoseo/PocketQuake"
+"NECIS downloader" = "https://github.com/seismoseo/necis-downloader"
+"Cluster pipeline" = "https://github.com/seismoseo/korea-cluster-relocation"
+
+[tool.setuptools.packages.find]
+include = ["pocketquake*"]
+exclude = ["external*", "tests*"]
