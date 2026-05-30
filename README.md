@@ -11,11 +11,34 @@ Given just a catalog CSV like
 
 ```
 Year,Month,Day,Hour,Minute,Second,Latitude,Longitude,Magnitude,Depth
-2024,9,12,23,47,19,35.46,128.43,2.6,16
-…
+2025,2,7,2,35,34,37.14,127.76,3.1,9
+2025,2,7,2,54,38,37.14,127.76,1.4,6
+2025,2,7,3,49,4,37.14,127.76,1.5,7
+2025,2,8,10,13,23,37.14,127.76,1.6,7
 ```
 
 PocketQuake scaffolds a cluster, downloads the event waveforms, runs the picking → HypoDD → focal-mechanism chain, and produces an executed `03_results_<cluster>.ipynb` with epicenter maps, depth sections, fault-frame sections, bootstrap error bars, and beachballs.
+
+### Worked example: chungju (4 events, Feb 2025)
+
+The 4-event chungju sequence shipped under `examples/chungju/chungju_catalog.csv` is the
+canonical PocketQuake example — small enough to run quickly (~15 min wall-clock end-to-end),
+and dense enough to exercise every stage of the pipeline:
+
+- **Locations** (HypoInverse, kim1983): 4 events at (37.142, 127.760), depths 7.3 → 10.2 km,
+  RMS 0.22 – 0.28 s, ERH 0.2 km — all grade B.
+- **Relative relocation** (dt.cc): cluster tightens to ±100 m around (37.142, 127.759, 7.2 km).
+- **Focal mechanisms** (SKHASH): the M3.1 mainshock + two aftershocks are grade A/B
+  near-vertical strike-slip (strike ≈ 200°, dip 84–87°, rake near ±180°); the smallest M1.6
+  drops to grade C with 13.5% polarity misfit (visible in the custom beachball as off-quadrant
+  triangles).
+
+The `03_results_chungju.ipynb` showcases every PocketQuake visual: catalog map, depth
+sections, distance record sections (Z traces ordered by hypocentral distance, P/S picks
+overlaid against the depth-averaged moveout), the dt.cc relocation map, the
+polarity-and-S/P-overlay beachball gallery, fault-frame sections, an interactive 3-D view,
+and a polarity-quality panel. See `examples/chungju/README.md` (TODO) for the per-stage
+walkthrough.
 
 ## Architecture
 

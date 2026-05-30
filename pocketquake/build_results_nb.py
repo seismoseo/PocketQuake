@@ -161,36 +161,36 @@ if not _FM_OK:
 else:
     display(tbl)
     viz.map_mechanisms(cfg, VELMODEL); plt.show()""")
-co(r"""# per-event beachball gallery (SKHASH plots) for the high-confidence events
+md("""### Per-event beachball gallery (polarities + S/P amplitude ratios)
+
+`viz.plot_custom_beachball` overlays SKHASH's per-station inversion data on the obspy beach
+rendering — **filled red triangles** are upward first-motion picks (compressional, should land
+in the gray quadrants), **blue triangles** are downward (dilatational, white quadrants), with
+marker size ∝ polarity weight `|p_polarity|`. The small offset **circles** are coloured by
+log₁₀ of the S/P amplitude ratio (viridis, clipped to ±2). The visible mismatches are the
+polarity-misfit % SKHASH reports in the table above; a clean fit (low misfit) shows almost all
+triangles on the model-predicted side of the nodal planes.""")
+co(r"""# per-event beachball gallery (polarity + S/P overlays via viz.plot_custom_beachball)
 if not _FM_OK:
     print("(no mechanisms.csv — skipping beachball gallery)")
 else:
- from matplotlib import image as mpimg
- mech = pd.read_csv(config.fm_mech_csv(cfg, VELMODEL)).drop_duplicates("event_id")
- e2c  = dict(zip(mech.event_id.astype(str), mech.cuspid.astype(int)))
- # prefer the high-confidence (A/B) events; if none (e.g. coverage-limited clusters), show the
- # best-graded events anyway so the (low-confidence) mechanisms are still visible
+ # prefer the high-confidence (A/B) events; if none, fall back to the best-graded ones so
+ # any solution is at least visible
  hi   = tbl[tbl.quality.isin(cfg.fm_quality_keep)] if len(tbl) else tbl
  sel  = (hi if len(hi) else tbl.sort_values("quality")).head(9)
  ids  = list(sel.event_id.astype(str))
- out  = config.fm_out_dir(cfg, VELMODEL)
  if ids:
      ncol = min(3, len(ids)); nrow = (len(ids) + ncol - 1) // ncol
-     fig, axes = plt.subplots(nrow, ncol, figsize=(3.6 * ncol, 3.8 * nrow), squeeze=False)
+     fig, axes = plt.subplots(nrow, ncol, figsize=(5.2 * ncol, 5.6 * nrow), squeeze=False)
      for ax in axes.ravel():
          ax.axis("off")
      for ax, eid in zip(axes.ravel(), ids):
-         r = sel[sel.event_id.astype(str) == eid].iloc[0]
-         png = os.path.join(out, f"{e2c.get(eid)}.png")
-         if os.path.exists(png):
-             ax.imshow(mpimg.imread(png))
-         ax.set_title(f"{eid}   {r.quality}\ns/d/r = {r.strike:.0f}/{r.dip:.0f}/{r.rake:.0f}",
-                      fontsize=9)
-     fig.suptitle(f"{cfg.region} — high-confidence focal mechanisms (SKHASH beachballs)", fontsize=11)
+         viz.plot_custom_beachball(cfg, eid, velmodel=VELMODEL, ax=ax)
+     fig.suptitle(f"{cfg.region} — focal mechanisms with polarity + S/P overlays",
+                  fontsize=12, y=1.0)
      plt.tight_layout(); plt.show()
  else:
-     print("No high-confidence (A/B) mechanisms for this run "
-           "(needs a phasenet_plus focal_mechanism run).")""")
+     print("No mechanisms to plot (needs a phasenet_plus focal_mechanism run).")""")
 
 md("""## 4. Seismicity in fault coordinates
 

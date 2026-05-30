@@ -3,6 +3,55 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.0.0 — 2026-05-31
+
+The 1.0 milestone. Two framework features land — AI-pick-probability HypoInverse weighting
+and polarity-/S-P-overlay beachballs — plus the Chungju Feb-2025 sequence becomes the
+canonical PocketQuake example in the docs.
+
+**Added**
+- `pipeline/core/hypoinverse.py:_weight_prob` + `_load_picks_csv`, and a refactored
+  `write_phs` that consults per-event picks CSVs to set the `.phs` weight code (column 18)
+  from the PhaseNet+ pick probability instead of epicentral-distance bins. Falls back to
+  distance per-pick if a probability is missing.
+- `pipeline/config.py:ClusterConfig.phs_weight_scheme` (`"distance"` | `"probability"`) and
+  `phs_prob_weight_bins` (defaults to `((0.90, 0), (0.70, 1), (0.50, 2), (0.30, 3), (0.00, 4))`,
+  descending threshold → weight code).
+- `pipeline/viz.py:plot_custom_beachball(cfg, event_id, ...)` — wraps ObsPy `beach()` and
+  overlays the SKHASH per-station inversion data: red ▲ for upward first motion, blue ▼ for
+  downward (sized by polarity weight), with a small offset circle per station colored by
+  log₁₀(S/P) on the viridis ramp. Lower-hemisphere equal-area projection; takeoff > 90°
+  rays are antipodal-flipped per HASH convention. `out_polinfo.csv` (cuspid-keyed) is
+  translated via `mechanisms.csv` so callers can pass either the UTC event_id or the cuspid.
+- `examples/chungju/README.md` — the canonical PocketQuake walkthrough featuring the
+  4-event Feb 2025 chungju sequence: stage table, expected locations / focal-mechanism
+  grades, and the per-event beachball gallery as the headline visualisation.
+- README.md headline example switched to chungju (with the 4-event catalog block) plus a
+  "Worked example: chungju" section with the location / RMS / FM grade summary.
+
+**Changed**
+- `pocketquake/scaffold.py` now emits `replace(CONFIG, phs_weight_scheme="probability")` in
+  every auto-generated `pipeline/clusters/<name>.py`. PocketQuake-scaffolded clusters opt
+  into probability weighting by default; existing source clusters (gwangyang, jangsung,
+  kimcheon, gyeongju) keep `"distance"` so the v0.5.0 baseline stays byte-identical.
+- `pocketquake/build_results_nb.py` — the per-event focal-mechanism gallery cell now calls
+  `viz.plot_custom_beachball()` instead of embedding the SKHASH PNGs raw. The cell explains
+  the new overlay legend (▲/▼ for polarity, colored circles for S/P ratio) so a notebook
+  reader can interpret the per-station fit at a glance.
+
+**Verified**
+- **chungju** (the headline example): re-run end-to-end with probability weighting. 423 picks
+  weighted from probability (0 distance fallbacks). 4 events at (37.142, 127.760), depths
+  7.3–10.2 km, RMS 0.22–0.28 s, all grade B at HypoInverse. dt.cc tightens to ±100 m around
+  (37.142, 127.759, 7.2 km). Focal mechanisms: 3 grade A/B near-vertical strike-slip
+  (strike 188–204°, dip 83–87°, rake near ±180°); M1.6 multi-solution C/D (13 polarities,
+  13.5 % polarity-misfit visible in the new beachball). Notebook 31 cells, 0 errors.
+- **changnyeong** (mainshock-treatment example): re-run with probability weighting. 302 picks
+  weighted from probability. M2.6 grade A (strike 192°, dip 88°, rake -178°), conjugate
+  aftershocks grade A/B. Notebook 31 cells, 0 errors.
+- **Source clusters byte-identity**: gwangyang / jangsung / kimcheon / gyeongju all confirmed
+  on `phs_weight_scheme="distance"` — no `.phs` changes.
+
 ## 0.5.5 — 2026-05-30
 
 Changnyeong mainshock-treatment notebook regenerated against the v0.5.3 CRH-fix baseline. The
