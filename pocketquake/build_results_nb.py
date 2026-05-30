@@ -252,9 +252,13 @@ _DEFAULT_OUT = os.path.join(_PQ_ROOT, "external", "korea-cluster-relocation",
 
 def build(cluster: str, out_dir: str = _DEFAULT_OUT) -> str:
     """Write 03_results_<cluster>.ipynb under `out_dir` and return the path."""
-    for c in C:                                   # inject the cluster name into the PARAMS cell
-        if c.cell_type == "code" and 'CLUSTER    = "gwangyang"' in c.source:
+    for c in C:                                   # inject the cluster name + clear the eq-cycle's
+        if c.cell_type == "code" and 'CLUSTER    = "gwangyang"' in c.source:   # _pnplus suffix
             c.source = c.source.replace('CLUSTER    = "gwangyang"', f'CLUSTER    = "{cluster}"')
+            # PocketQuake clusters run with default `output_root = runs/<cluster>/` (no `_pnplus`
+            # side-by-side run), so point the notebook there. The template defaults to `_pnplus`
+            # because the source clusters keep a stead vs phasenet_plus comparison.
+            c.source = c.source.replace('RUN_SUFFIX = "_pnplus"', 'RUN_SUFFIX = ""')
     nb["cells"] = C
     nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
     os.makedirs(out_dir, exist_ok=True)
