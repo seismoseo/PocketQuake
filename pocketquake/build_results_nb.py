@@ -130,6 +130,21 @@ print("Sample event:", SAMPLE_EVENT)
 viz.plot_3c(cfg, SAMPLE_EVENT); plt.show()
 viz.plot_polarities(cfg, SAMPLE_EVENT); plt.show()""")
 
+md("""### Picks QC — distance record section per event
+
+For every event, the **distance record section** (`viz.plot_record_section`) shows Z-component traces
+ordered by epicentral distance with the AI picks (P=red, S=blue) overlaid as vertical ticks, alongside the
+predicted P/S moveout curves from `cfg.pick_window["vp"]`/`["vs"]` (red/blue dashed). The defaults use the
+picker's own thresholds — `cfg.p_threshold` / `cfg.s_threshold` — so every emitted pick appears, including
+weak ones. **Picks that drift off the predicted moveout line are the diagnostic** for a depth-mis-matched
+picking window or noise-contaminated picks.""")
+co(r"""# one record section per event in the catalog
+import glob as _glob
+_pfs = sorted(_glob.glob(os.path.join(config.picks_dir(cfg), "*_picks.csv")))
+for _pf in _pfs:
+    _eid = os.path.basename(_pf).split("_")[0]
+    viz.plot_record_section(cfg, _eid); plt.show()""")
+
 md("""## 3. Focal mechanisms
 
 The table is one row per event (best quality kept) and lists **both nodal planes** —
