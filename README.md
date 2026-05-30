@@ -50,12 +50,20 @@ playwright install chromium       # one-time, for NECIS scraping
 
 cp .env.example .env              # then edit NECIS_USER / NECIS_PASS
 
-# Try the bundled changnyeong example (3 events, 2024-09-12 swarm)
+# One-command wrapper (auto-derives epicenter + bounds from the catalog;
+# runs in nohup background by default; pass --fg for foreground; --help for options):
+./pocketquake.sh examples/changnyeong/changnyeong_catalog.csv mytest
+
+# Full CLI form (when you want explicit control):
 pocketquake examples/changnyeong/changnyeong_catalog.csv \
     --cluster changnyeong \
     --epicenter 35.463,128.427 \
     --region-bounds 35.3,35.65,128.25,128.65
 ```
+
+`pocketquake.sh` is the friendly one-liner; it auto-derives the epicenter (catalog centroid)
+and region bounds (catalog bbox + 0.2°), checks credentials, and chains the optional
+Gwangyang-style mainshock treatment when you pass `--mainshock UTC_YYYYMMDDHHMMSS`.
 
 That single command:
 
