@@ -102,10 +102,21 @@ def _parse_sta_output(stdout: str, networks: tuple[str, ...]) -> dict:
         except (ValueError, IndexError):
             continue
         rows.append((net, code, lat, lon, elev))
+    # STP lists each station twice -- once with elevation in metres (e.g. ADO2 = 320) and once
+    # in kilometres (ADO2 = 0.324, a unit bug in STP's own output, not two separate sensors).
+    # Dedup by (Network, Code) keeping the larger Elevation -- the metres-valued row, which is
+    # the correct unit for the eq-cycle station-table format. Without this dedup
+    # used_stations_100km.csv has duplicate codes and per-station Sensor lookups in
+    # viz.plot_3c return a Series instead of a scalar, breaking the SAC-file glob.
     out = {}
     for net in networks:
         sub = [r for r in rows if r[0] == net]
-        out[net] = pd.DataFrame(sub, columns=["Network", "Code", "Latitude", "Longitude", "Elevation"])
+        df = pd.DataFrame(sub, columns=["Network", "Code", "Latitude", "Longitude", "Elevation"])
+        # Keep the surface installation per code (highest elevation)
+        df = (df.sort_values("Elevation", ascending=False)
+                .drop_duplicates(subset=("Network", "Code"), keep="first")
+                .reset_index(drop=True))
+        out[net] = df
     return out
 
 

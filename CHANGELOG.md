@@ -3,6 +3,47 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.1.2 — 2026-05-31
+
+Three follow-ups from inspecting the v1.1.1 Sangju notebook.
+
+**Added**
+- `viz.fault_sections(..., frame_from=...)` + `viz.plot_3d_plane(..., frame_from=...)` — the
+  fault-frame 2×2 figure and the 3-D plotly view now default to the **mainshock's NP1**
+  (the SKHASH-reported nodal plane) as the fault plane, anchored at the mainshock
+  hypocenter, instead of the SVD best-fit plane of the relocated cloud. SVD is unstable
+  on tight swarms (its strike is dominated by noise when the cloud is ~50 m across);
+  for clusters with a clear mainshock, the focal-mechanism plane is the right geometric
+  reference. `frame_from` options: `"auto"` (default — mechanism plane when a
+  high-confidence FM is available, SVD otherwise), `"svd"` (always SVD — v1.1.1 behavior),
+  `"mechanism"` (force mechanism plane; raises if no FM or the mainshock isn't in the reloc).
+  Explicit `strike=` / `dip=` kwargs still win when provided (use them to plot NP2 instead).
+
+**Fixed**
+- `pocketquake/stp_bridge.py:fetch_stp_station_table` deduplicates by `(Network, Code)`,
+  keeping the higher-elevation row. STP's `sta` command lists each station twice — once
+  with elevation in metres (e.g. `KS,ADO2,...,320`) and once in km
+  (`KS,ADO2,...,0.324`, a unit bug in STP's own output, not two separate sensors). Without
+  the dedup, `used_stations_100km.csv` got duplicate codes (113 in the Sangju run), which
+  broke per-station Sensor lookups in `viz.plot_3c` (returned a Series instead of a
+  scalar, so the SAC-file glob expanded with `"Code\nADO2  EL\n..."` and matched nothing —
+  the Sangju notebook's sample-event panel rendered three empty axes labelled "(none)").
+- `viz.plot_3c` now scalar-coerces the `Sensor` lookup defensively so any future
+  duplicate-row station table can't recreate the empty-axes failure.
+
+**Verified — Sangju re-run end-to-end**
+- Default pipeline (deduped station table): 6 events located, 502 picks (vs 703 with
+  duplicated stations — the duplicated stations contributed false-positive picks). dt.cc
+  tightens the 2019 swarm (event 200000 dropped by HypoDD clustering, same as v1.1.1).
+- Focal mechanisms: M3.9 grade A (strike 194.8°, dip 86.6°, rake -169.3°), plus 3 more
+  grade-A in the 2019/2022 set.
+- Default notebook 31 cells / 0 errors; sample-event 3-c plot now renders real waveforms.
+- Gwangyang-style mainshock treatment re-applied via the v1.1.1 `--mainshock-only` path:
+  the 2019 swarm shifts ~30 m south, ~500 m west, depth-shifts ~30 m shallower relative
+  to the untreated v1.1.2 baseline. `_main` notebook 32 cells / 0 errors.
+- Fault-frame and 3-D plots now show the M3.9 NP1 (strike 195°, dip 87°, N–S right-lateral)
+  passing through the mainshock hypocenter — geologically the actual fault.
+
 ## 1.1.1 — 2026-05-31
 
 Surgical follow-up to v1.1.0. Adds `pocketquake.sh --mainshock-only` and applies the
