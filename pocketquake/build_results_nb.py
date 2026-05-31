@@ -104,13 +104,27 @@ display(_sty if _sty is not None else "No dt.cc reloc for this run.")""")
 co(r"""viz.map_catalog(cfg, velmodel=VELMODEL, source="sum"); plt.show()
 viz.depth_sections(cfg, velmodel=VELMODEL, source="sum"); plt.show()
 viz.cumulative_events(cfg, velmodel=VELMODEL); plt.show()""")
-co(r"""# headline relocated catalog (dt.cc if present, else dt.ct)
+co(r"""# headline relocated catalog (dt.cc if present, else dt.ct) — bootstrap-filtered
 if os.path.exists(os.path.join(config.dtct_dir(cfg), "hypoDD.reloc")):
     viz.map_catalog(cfg, velmodel=VELMODEL, source="reloc"); plt.show()
     if os.path.exists(os.path.join(config.dtcc_dir(cfg), "hypoDD.reloc")):
         viz.compare_epicenters(cfg, velmodel=VELMODEL); plt.show()   # dt.ct vs dt.cc
 else:
     print("No HypoDD reloc for this run — showing absolute (.sum) locations only.")""")
+
+md("""### Summary view — all events, no bootstrap filtering
+
+A clean overview for presentation: every event in the catalog, the bootstrap-filtered ones as
+filled depth-coloured circles (from the dt.cc reloc), and the events that HypoDD's clustering
+or the bootstrap dropped overlaid as **hollow squares** at their HypoInverse (.sum) absolute
+location. Bootstrap error bars are suppressed — for those, see the headline plot above.""")
+co(r"""# all-events summary view (include the dt.cc-dropped + bootstrap-under-constrained,
+# without bootstrap error bars — a clean representative plot for the whole catalog).
+if os.path.exists(os.path.join(config.dtcc_dir(cfg), "hypoDD.reloc")):
+    viz.map_catalog(cfg, velmodel=VELMODEL, source="reloc",
+                    include_all=True, show_errors=False); plt.show()
+    viz.depth_sections(cfg, velmodel=VELMODEL, source="reloc",
+                       include_all=True, show_errors=False); plt.show()""")
 
 md("""## 2. Picks and first-motion polarity
 

@@ -3,6 +3,45 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.2.0 — 2026-05-31
+
+Four feature requests from inspecting the post-v1.1.4 Sangju notebook:
+
+**Added**
+- **`viz.map_catalog(..., include_all=False, show_errors=True)`** and
+  **`viz.depth_sections(..., include_all=False, show_errors=True)`** — when
+  `include_all=True`, events that HypoDD's clustering or the bootstrap dropped get
+  overlaid as **hollow squares at their HypoInverse (.sum) absolute locations** on top of
+  the dt.cc-relocated set, so you can see the whole catalog in one view. `show_errors=False`
+  skips the bootstrap error bars / ellipsoids — useful for a clean summary plot.
+- **New "Summary view" cell in the generated notebook** (`build_results_nb.py`) using the
+  above kwargs: map + depth sections with every event in the catalog, hollow squares for
+  the events dt.cc dropped, no error bars. Sits right after the bootstrap-filtered headline
+  plot so both are visible side-by-side.
+- **Per-stage timing summary in `pipeline.core.pipeline:run_cluster`**: each stage is
+  individually timed with a `time.perf_counter()` context manager; per-stage seconds are
+  appended to each stage's log line, and a stage-by-stage table prints at the end of the
+  run (e.g. `picking 32.1s 41.2%` + a `TOTAL` row). The timings dict is also returned in
+  the result under the `_timings` key for downstream consumption.
+
+**Fixed**
+- **S/P amplitude colormap contrast** in `plot_custom_beachball`. The previous clip was
+  fixed at `(-2, +2)` for `log10(S/P)`, but the actual data range for sangju / chungju is
+  only **-0.3 to +0.8** (median ≈ 0). All markers compressed into the middle of the
+  viridis ramp → every circle looked the same teal-green shade. Now uses a **diverging
+  RdBu_r colormap centred at 0**, **auto-ranged to the 95th-percentile** of `|log10(S/P)|`
+  in the actual data (with the `sp_log_clip` kwarg acting as an OUTER bound to cap
+  outliers). The Sangju M3.9 beachball now visibly distinguishes stations with high
+  S/P (red), low S/P (blue), and near-balance (white).
+
+**Verified**
+- Sangju + chungju + changnyeong notebooks regenerated (33 / 33 / 33 cells, 0 errors each).
+- Sangju mainshock-treated `_main` notebook (34 cells, 0 errors).
+- The summary view in the sangju notebook now shows all 6 events (4 relocated + 2 hollow
+  squares for the 2018 + 2022 events HypoDD dropped from clustering).
+- The Sangju focal-mechanism gallery (`03_beachball_gallery.png`) and individual M3.9
+  detail figure regenerated to use the new diverging S/P colormap.
+
 ## 1.1.4 — 2026-05-31
 
 Fixes a stale-derivation bug in `viz.fault_sections`'s B-B' across-strike depth section.
