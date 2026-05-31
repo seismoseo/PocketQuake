@@ -3,6 +3,32 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.1.3 — 2026-05-31
+
+Fixes a wrong default in v1.1.2: the user confirmed that for Sangju the M3.9's **NP2**
+(aux, E-W) is the actual fault plane, not NP1 (N-S). The dt.cc-relocated 2019 swarm
+clearly elongates E-W (~360 m vs ~140 m N-S), which is the visual signal that picks the
+correct plane — exactly the SVD-strike match heuristic I had in the first v1.1.2
+implementation but oversimplified away to "always NP1". Restored.
+
+**Changed**
+- `pipeline/viz.py:_mechanism_plane` now disambiguates NP1 vs NP2 by **matching the
+  reference mechanism's nodal-plane strike to the SVD strike of the relocated cloud**
+  (circular distance mod 180°, since strike is bidirectional). The plane whose strike is
+  closer to the cloud's elongation direction wins. Falls back to NP1 only when no SVD
+  strike is available.
+- Result for **sangju**: now picks NP2 (strike **104.2°**, dip 79.3°) — only **0.7° off**
+  the cloud's SVD strike of 103.5°. NP1 was 88° off, wrong.
+- Result for **chungju**: also now picks NP2 (strike 113.7°, dip 89.5°) — its cloud's
+  SVD strike is 125.2°, closer to NP2 (12°) than NP1 (88°). If you've reasoned out NP1 as
+  the actual rupture plane for chungju, pass explicit `strike=`/`dip=` to `fault_sections`
+  / `plot_3d_plane`.
+
+**Verified**
+- Sangju default + `_main` notebooks regenerated (31 cells / 32 cells, 0 errors). Fault-frame
+  sections now use NP2 of the M3.9 mainshock, anchored at the mainshock hypocenter.
+- Chungju fault_sections demo figure refreshed for docs consistency.
+
 ## 1.1.2 — 2026-05-31
 
 Three follow-ups from inspecting the v1.1.1 Sangju notebook.
