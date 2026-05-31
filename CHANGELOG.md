@@ -3,6 +3,26 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.1.4 — 2026-05-31
+
+Fixes a stale-derivation bug in `viz.fault_sections`'s B-B' across-strike depth section.
+
+**Fixed**
+- The dashed "Dip N°" line in panel 3 (B-B') was being drawn from the **SVD normal** of the
+  relocated cloud, while the rotation `th` and the label used `used_strike`/`used_dip` from
+  the chosen mechanism plane. So the drawn slope was tan(SVD_dip) — for sangju 73.8°, while
+  the label said 79°. The line also anchored at the cloud centroid rather than the mainshock
+  hypocenter. Both wrong when frame_from selected the mechanism plane (v1.1.2+ default).
+- Now the dip line is drawn directly from `used_dip`: slope = -tan(used_dip), passing through
+  (across, depth) = (0, 0) — i.e. the mainshock hypocenter (per the v1.1.2 centring contract).
+  Label and drawn slope now always agree.
+
+**Verified**
+- Sangju default + `_main` notebooks regenerated (31 / 32 cells, 0 errors). The B-B' panel's
+  dashed line now passes through the mainshock and dips at exactly the labelled 79°.
+- Chungju notebook regenerated similarly (its mechanism dip 89.5° → near-vertical line, also
+  now correctly anchored at the mainshock hypocenter).
+
 ## 1.1.3 — 2026-05-31
 
 Fixes a wrong default in v1.1.2: the user confirmed that for Sangju the M3.9's **NP2**
