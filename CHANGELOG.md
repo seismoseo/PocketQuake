@@ -3,6 +3,29 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.1.1 — 2026-05-31
+
+Surgical follow-up to v1.1.0. Adds `pocketquake.sh --mainshock-only` and applies the
+Gwangyang-style mainshock treatment to the Sangju 2019 swarm.
+
+**Added**
+- `pocketquake.sh --mainshock-only` flag — skips the default pipeline pass entirely and
+  runs only the mainshock treatment block (snapshot + cluster-module patch + xcorr→dtcc
+  + `_main` notebook). Useful for re-running treatment on an already-completed cluster
+  without redoing scaffold / download / picking / location. Requires `--mainshock` to be
+  set; preflights that `runs/<cluster>/2.HypoDD/02.dt.cc/hypoDD.reloc` already exists.
+
+**Verified**
+- **Sangju** — applied the Gwangyang-style treatment for the 2019-07-21 M3.9 mainshock
+  (`mainshock_event_id="20190721020418"`, narrow ±0.05 s / 1–40 Hz xcorr window on
+  mainshock-paired events). Re-ran only xcorr → dtcc; picking + HypoInverse unchanged from
+  v1.1.0. Result: the 2019 swarm latitude tightens 250 → 140 m, depth shifts ~400 m
+  shallower (13.9 km vs 14.3 km untreated). Notebook `03_results_sangju_main.ipynb`
+  built and executed cleanly (32 cells, 0 errors). The 2018 event (200000) was dropped
+  from the treated reloc by HypoDD's `OBSCC=4` clustering threshold — it had zero cc
+  pairs in both runs, only dt.ct connections, and the narrow-window reshuffle pushed it
+  below the cluster-membership threshold. Documented in the `_main` notebook header.
+
 ## 1.1.0 — 2026-05-31
 
 **STP waveform source for older events.** v1.0.0 only fetched via KMA NECIS, which limited

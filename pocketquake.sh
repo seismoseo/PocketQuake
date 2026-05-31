@@ -46,6 +46,11 @@ OPTIONS
                                   that NECIS no longer serves as event segments)
   --mainshock UTC_YYYYMMDDHHMMSS  also run Gwangyang-style mainshock treatment after the
                                   default pipeline (re-runs xcorr→dtcc, builds a _main notebook)
+  --mainshock-only                skip the default pipeline pass (it must already be complete)
+                                  and run ONLY the mainshock treatment + _main notebook —
+                                  useful for re-running treatment on an existing cluster
+                                  without redoing scaffold / download / picking / location.
+                                  Requires --mainshock.
   --fg                            run in foreground (default: nohup background)
   -h, --help                      show this and exit
 
@@ -70,7 +75,7 @@ hdr(){ echo; echo "▸ $*"; }
 # ---- arguments ----
 [[ $# -lt 2 ]] && usage 1
 CATALOG="$1"; SLUG="$2"; shift 2
-EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"
+EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
@@ -78,12 +83,14 @@ while [[ $# -gt 0 ]]; do
         --picker)          PICKER="$2"; shift 2 ;;
         --source)          SOURCE="$2"; shift 2 ;;
         --mainshock)       MAINSHOCK="$2"; shift 2 ;;
+        --mainshock-only)  MAIN_ONLY=1; shift ;;
         --fg|--foreground) FG=1; shift ;;
         -h|--help)         usage 0 ;;
         *) fail "unknown option: $1" ;;
     esac
 done
 [[ "$SOURCE" == "necis" || "$SOURCE" == "stp" ]] || fail "--source must be 'necis' or 'stp' (got: $SOURCE)"
+[[ "$MAIN_ONLY" == "1" && -z "$MAINSHOCK" ]] && fail "--mainshock-only requires --mainshock UTC_YYYYMMDDHHMMSS"
 
 # ---- preflight ----
 hdr "preflight"
@@ -148,8 +155,17 @@ CMD=(
 LOG="$HERE/${SLUG}_run.log"
 
 cd "$HERE"
-hdr "launching default pipeline (log: $LOG)"
-if [[ "$FG" == "1" ]]; then
+if [[ "$MAIN_ONLY" == "1" ]]; then
+    # --mainshock-only: skip the default pipeline pass entirely; the cluster's runs/
+    # directory must already exist (i.e. you ran the default pipeline previously and now
+    # want to overlay the Gwangyang-style treatment without redoing scaffold / download
+    # / picking / location).
+    RELOC="$EQDIR/pipeline/runs/${SLUG}/2.HypoDD/02.dt.cc/hypoDD.reloc"
+    [[ -f "$RELOC" ]] || fail "--mainshock-only set but $RELOC missing — run the default pipeline first"
+    hdr "skipping default pipeline (--mainshock-only)"
+    ok "cluster runs/ already present; jumping to mainshock treatment"
+elif [[ "$FG" == "1" ]]; then
+    hdr "launching default pipeline (log: $LOG)"
     "${CMD[@]}" 2>&1 | tee "$LOG"
     DEFAULT_RC="${PIPESTATUS[0]}"
     [[ "$DEFAULT_RC" == "0" ]] || fail "default pipeline failed (exit $DEFAULT_RC)"
