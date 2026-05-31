@@ -28,6 +28,14 @@ RUN_SUFFIX = "_pnplus"          # output tree = runs/<cluster><suffix>; "" = the
 VELMODEL   = "kim1983"          # velocity model whose .sum / mechanisms to show
 N_BOOT     = 1000               # bootstrap replicas for the 95% location error bars (cached)
 BOOT_SEED  = 0                  # bootstrap RNG seed (reproducible)
+FRAME_FROM = "auto"             # fault-frame plane for sections 4 & 5:
+                                #   "auto"      — mainshock nodal plane (NP1/NP2 matched to SVD strike)
+                                #                 if a grade-A/B mechanism exists; else SVD fallback.
+                                #   "svd"       — always use the SVD best-fit plane of the relocated cloud.
+                                #                 Use this when the mechanism is unreliable (small mainshock,
+                                #                 grade C/D) but the relocation forms a clear lineation
+                                #                 (Uiseong-type cases).
+                                #   "mechanism" — always use the mainshock nodal plane (raises if absent).
 
 cfg0 = config.load_cluster(CLUSTER)
 cfg  = config.tune(cfg0, output_root=os.path.join(config.RUNS_ROOT, f"{CLUSTER}{RUN_SUFFIX}")) \
@@ -126,6 +134,17 @@ if os.path.exists(os.path.join(config.dtcc_dir(cfg), "hypoDD.reloc")):
     viz.depth_sections(cfg, velmodel=VELMODEL, source="reloc",
                        include_all=True, show_errors=False); plt.show()""")
 
+md("""### HypoDD link map — inter-event differential-time connectivity
+
+Each line is a HypoDD event pair, drawn between the two relocated epicenters and **coloured by
+the number of differential-time observations** (P + S combined) for that pair — the strongest
+doublets are the brightest and thickest lines. Left panel uses absolute travel-time differences
+(`dt.ct`, catalog phase picks); right panel uses the cross-correlation differential times
+(`dt.cc`) above the configured cc-threshold. Sparse links (a single weak obs) are kept by
+default; pass `min_obs=N` to declutter big clusters.""")
+co(r"""# inter-event link map for both HypoDD branches (cc on the right when present).
+viz.link_maps(cfg, velmodel=VELMODEL); plt.show()""")
+
 md("""## 2. Picks and first-motion polarity
 
 PhaseNet+ picks carry a first-motion **polarity** (up/down) — the input to the focal-mechanism inversion.
@@ -212,10 +231,16 @@ md("""## 4. Seismicity in fault coordinates
 a **fault-plane map view** (with the strike line, the perpendicular, and the focal-mechanism beachball),
 an **along-strike** depth section (A–A'), an **across-strike** depth section (B–B', dashed line = dip),
 and a **fault-plane (along-dip) view**. Markers are coloured by origin time (so migration is visible)
-and sized by magnitude. The orientation is the **best-fit plane of the relocated cloud** (data-driven,
-via SVD), with the focal mechanism overlaid only for comparison — pass `strike=`/`dip=` to override.
-A tight across-strike spread indicates a near-planar fault.""")
-co(r"""viz.fault_sections(cfg, VELMODEL); plt.show()""")
+and sized by magnitude.
+
+The orientation comes from `FRAME_FROM` in the params block above: `"auto"` (default) uses the
+mainshock's nodal plane (NP1/NP2 matched to SVD strike) when a grade-A/B mechanism is available;
+`"svd"` forces the data-driven SVD best-fit plane (use this when the relocation lineation is
+strong but the mechanism is small/unreliable — e.g. Uiseong, where a clear N-S aftershock streak
+disagrees with the grade-B mainshock's nodal strike); `"mechanism"` always uses the mechanism.
+Pass `strike=`/`dip=` to override entirely. A tight across-strike spread indicates a near-planar
+fault.""")
+co(r"""viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM); plt.show()""")
 
 md("""## 5. Seismicity in 3-D (interactive)
 
@@ -223,7 +248,7 @@ md("""## 5. Seismicity in 3-D (interactive)
 coloured by origin time, sized by magnitude) with the SVD best-fit fault plane overlaid as a translucent
 patch — rotate/zoom to judge planarity and dip. (Interactivity is live in a running notebook; committed
 notebooks are output-stripped, and a static export needs the optional `kaleido` package.)""")
-co(r"""fig3d = viz.plot_3d_plane(cfg, VELMODEL)
+co(r"""fig3d = viz.plot_3d_plane(cfg, VELMODEL, frame_from=FRAME_FROM)
 try:                                  # optional static export (needs kaleido); harmless if absent
     fig3d.write_image(f"/tmp/{CLUSTER}_3d.png", scale=2)
 except Exception as _e:
@@ -233,7 +258,7 @@ md("""The same view with the per-event uncertainty drawn as a **95% bootstrap er
 (`error="ellipsoid"`) instead of whisker bars: each ellipsoid's shape is the bootstrap sample covariance
 and its size the empirical 95% Mahalanobis radius (95% of replicas inside), coloured like its hypocentre.
 Tight horizontal but loose depth control shows up as a vertically elongated ellipsoid.""")
-co(r"""fig3d_e = viz.plot_3d_plane(cfg, VELMODEL, error="ellipsoid")
+co(r"""fig3d_e = viz.plot_3d_plane(cfg, VELMODEL, error="ellipsoid", frame_from=FRAME_FROM)
 try:
     fig3d_e.write_image(f"/tmp/{CLUSTER}_3d_ellipsoid.png", scale=2)
 except Exception:

@@ -3,6 +3,42 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.3.0 — 2026-05-31
+
+Two features driven by the haman + uiseong notebooks.
+
+**Added**
+- **`viz.link_map(cfg, branch="dtcc"|"dtct", min_obs=1, …)`** and
+  **`viz.link_maps(cfg, velmodel=…)`** (side-by-side dt.ct + dt.cc) — overlay HypoDD
+  inter-event links on the relocation map, each line drawn between the two relocated
+  epicenters and **coloured + thickened by the number of differential-time observations**
+  (P + S combined) for that pair. The title reports `events / pairs / obs / unreloc-dropped`
+  so pruned pairs are surfaced. Sparse pairs are kept by default; `min_obs=N` declutters
+  big clusters. New cell in the generated results notebook ("HypoDD link map — inter-event
+  differential-time connectivity") right after the Summary view block, so every freshly
+  scaffolded cluster gets the panel automatically.
+- **`FRAME_FROM` parameter exposed in the notebook params block** (was already a kwarg on
+  `viz.fault_sections` / `viz.plot_3d_plane`, but not threaded through the call sites in
+  the generated notebook). Accepted values: `"auto"` (default, mainshock NP1/NP2 matched
+  to SVD strike when a grade-A/B mechanism exists, else SVD fallback); `"svd"` (always the
+  data-driven SVD best-fit plane — for Uiseong-type cases where the relocation forms a
+  clear lineation but the mechanism is small/unreliable and disagrees); `"mechanism"`
+  (always the mainshock plane). Section-4 markdown updated to document the choices.
+
+**Fixed**
+- The uiseong notebook (and any already-scaffolded notebook) had `FRAME_FROM = "svd"` in
+  the params but it was an unused variable because the call sites still read
+  `viz.fault_sections(cfg, VELMODEL)` without `frame_from=`. The template now passes
+  through; uiseong's three call sites patched in this release.
+
+**Verified**
+- Haman notebook (35 cells, 0 errors, 8.5 s re-execute with cached bootstrap; link map
+  shows the 2021 doublet at 16 obs and the 2021↔2024 pair at 14 obs as the strongest
+  bonds, weak inter-decade links visible).
+- Uiseong notebook (10.8 s; `FRAME_FROM="svd"` rotates the 2×2 sections to strike 219° /
+  dip 72° (SVD), with the grade-B M1.5 mechanism (185°/87°) shown as the inset beachball
+  for comparison only; 34° rotation from the auto pick).
+
 ## 1.2.0 — 2026-05-31
 
 Four feature requests from inspecting the post-v1.1.4 Sangju notebook:
