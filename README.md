@@ -11,6 +11,13 @@ PocketQuake glues two existing projects:
 - **[seismoseo/necis-downloader](https://github.com/seismoseo/necis-downloader)** — downloads KMA NECIS waveforms for a given event list.
 - **[seismoseo/korea-cluster-relocation](https://github.com/seismoseo/korea-cluster-relocation)** — HypoDD relocation + SKHASH focal-mechanism pipeline.
 
+For **older events** (pre-~2020) that NECIS no longer serves as downloadable event
+segments, PocketQuake can fetch via **STP** (Seoul National University's SAC Transfer
+Protocol at `mara.snu.ac.kr:46804`) instead — same one-command flow, just pass
+`--source stp`. See [examples/sangju/](examples/sangju/README.md) for a 2018–2022 worked
+example where the M3.9 mainshock and its aftershocks live in STP's archive but not in
+NECIS's.
+
 Given just a catalog CSV like
 
 ```

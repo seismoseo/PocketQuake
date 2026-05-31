@@ -3,6 +3,8 @@
 This document walks through the **changnyeong** example end-to-end, so you can see exactly what `pocketquake orchestrate` does under the hood and what artifacts land where.
 
 > For the **headline PocketQuake example** see [examples/chungju/README.md](../examples/chungju/README.md) — the 4-event chungju sequence (Feb 2025, M1.4–3.1) is the canonical demo and what the `03_results_chungju.ipynb` notebook is built around. Changnyeong walks through the same machinery but with three stacked events; it's kept here because it also exercises the optional Gwangyang-style mainshock treatment.
+>
+> For an example using **STP** instead of NECIS (for pre-~2020 events that NECIS no longer serves), see [examples/sangju/README.md](../examples/sangju/README.md) — same one-command flow, different waveform source. Add `--source stp` to the wrapper.
 
 ## The input
 

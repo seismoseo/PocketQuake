@@ -42,6 +42,8 @@ OPTIONS
   --epi LAT,LON                   override the auto-derived epicenter (catalog centroid)
   --bounds LAT0,LAT1,LON0,LON1    override the auto-derived bounds (catalog bbox + 0.2°)
   --picker {phasenet_plus|stead}  picker model (default: phasenet_plus)
+  --source {necis|stp}            waveform source (default: necis; use stp for pre-2020 events
+                                  that NECIS no longer serves as event segments)
   --mainshock UTC_YYYYMMDDHHMMSS  also run Gwangyang-style mainshock treatment after the
                                   default pipeline (re-runs xcorr→dtcc, builds a _main notebook)
   --fg                            run in foreground (default: nohup background)
@@ -68,18 +70,20 @@ hdr(){ echo; echo "▸ $*"; }
 # ---- arguments ----
 [[ $# -lt 2 ]] && usage 1
 CATALOG="$1"; SLUG="$2"; shift 2
-EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0
+EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
         --bounds)          BBOX="$2"; shift 2 ;;
         --picker)          PICKER="$2"; shift 2 ;;
+        --source)          SOURCE="$2"; shift 2 ;;
         --mainshock)       MAINSHOCK="$2"; shift 2 ;;
         --fg|--foreground) FG=1; shift ;;
         -h|--help)         usage 0 ;;
         *) fail "unknown option: $1" ;;
     esac
 done
+[[ "$SOURCE" == "necis" || "$SOURCE" == "stp" ]] || fail "--source must be 'necis' or 'stp' (got: $SOURCE)"
 
 # ---- preflight ----
 hdr "preflight"
@@ -95,10 +99,15 @@ for c in "${EXISTING[@]}"; do
 done
 ok "slug: $SLUG"
 
-[[ -f "$HERE/.env" ]] || fail "missing $HERE/.env (set NECIS_USER and NECIS_PASS)"
+[[ -f "$HERE/.env" ]] || fail "missing $HERE/.env (set NECIS_USER/NECIS_PASS for --source necis, STP_USER/STP_PASS for --source stp)"
 set -a; . "$HERE/.env"; set +a
-[[ -n "${NECIS_USER:-}" ]] || fail ".env loaded but NECIS_USER is empty"
-ok "NECIS credentials loaded ($NECIS_USER)"
+if [[ "$SOURCE" == "stp" ]]; then
+    [[ -n "${STP_USER:-}" && -n "${STP_PASS:-}" ]] || fail ".env loaded but STP_USER/STP_PASS missing (needed for --source stp)"
+    ok "STP credentials loaded ($STP_USER)"
+else
+    [[ -n "${NECIS_USER:-}" ]] || fail ".env loaded but NECIS_USER is empty"
+    ok "NECIS credentials loaded ($NECIS_USER)"
+fi
 
 [[ -x "$PY" ]] || fail "python env not found: $PY"
 ok "python: $PY"
@@ -124,6 +133,7 @@ fi
 ok "epicenter:   $EPI"
 ok "region-bbox: $BBOX"
 ok "picker:      $PICKER"
+ok "source:      $SOURCE"
 [[ -n "$MAINSHOCK" ]] && ok "mainshock:   $MAINSHOCK (treatment will be applied after default run)"
 
 # ---- the orchestrator command ----
@@ -133,6 +143,7 @@ CMD=(
     --epicenter "$EPI"
     --region-bounds "$BBOX"
     --picker "$PICKER"
+    --wf-backend "$SOURCE"
 )
 LOG="$HERE/${SLUG}_run.log"
 

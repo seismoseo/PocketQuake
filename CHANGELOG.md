@@ -3,6 +3,70 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.1.0 — 2026-05-31
+
+**STP waveform source for older events.** v1.0.0 only fetched via KMA NECIS, which limited
+PocketQuake to events from ~2020 onwards (NECIS's event-segment archive doesn't go further
+back). v1.1.0 adds **STP** (Seoul National University's SAC Transfer Protocol at
+`mara.snu.ac.kr:46804`) as an alternative waveform source, opening the whole 2000s+ archive
+to the same one-command flow. The user's Sangju Feb-2018 / Jul-2019 / Jul-2022 sequence
+is the new headline example — its M3.9 mainshock + aftershocks (all 2019) aren't reachable
+via NECIS but come through STP cleanly.
+
+**Added**
+- `pocketquake/stp_bridge.py` — STP automation: `fetch_stp_station_table` (writes the
+  historical-inclusive station roster from STP's `sta` command, **505 KS + 70 KG = 575
+  stations vs 465 in the modern bundled `KP_station_list.csv` — +110 stations that were
+  active before 2020 but since retired**) and `download_events_via_stp` (generates the
+  Gyeongju-2017-pattern batch and pipes it into `stp` with credentials).
+- `pipeline/clusters/_base.py:stp_cluster()` — sibling factory of `kma_cluster()`. Identical
+  defaults except `wf_source="stp_sac"`, `stp_sac_root=<src>/stp_download/SAC`, and the
+  per-sensor glob the existing eq-cycle framework already consumes (Gyeongju 2017 has been
+  using this layout since before PocketQuake existed).
+- `pocketquake.sh` new `--source {necis|stp}` flag (default `necis`); STP preflight checks
+  `STP_USER` / `STP_PASS` in `.env`.
+- `pocketquake/orchestrate.py:--wf-backend` CLI flag + dispatch on the chosen backend.
+- `pocketquake/scaffold.py:ClusterSpec.wf_backend` — toggles between the two cluster
+  factories at scaffold time; STP path also routes the station table through STP instead
+  of slicing the modern bundle.
+- `examples/sangju/README.md` — the new STP worked example (6 events, 2018–2022, M3.9
+  mainshock); 5 figures generated from the executed notebook.
+- `.env.example` documents `STP_USER` / `STP_PASS` alongside the existing `NECIS_USER` /
+  `NECIS_PASS`.
+
+**Fixed**
+- `pipeline/core/pipeline.py:run_cluster` now guards the relative-relocation chain
+  (ph2dt + dtct + xcorr + dtcc) against single-event input. The previous behavior crashed
+  with `SIGFPE` deep in `ph2dt.f` when only one event was located (e.g. a partial NECIS
+  download); now the chain logs `"only N event(s) located -- skipping ph2dt/dtct/xcorr/dtcc"`
+  and continues straight to `focal_mechanism` (which can still produce a single-event
+  solution if PhaseNet+ wrote polarities).
+
+**Verified**
+- **sangju via STP** (the new headline example): 6/6 events fetched (207–273 SACs each),
+  117 stations within radius (vs 57 with the modern bundled roster), 703 picks. HypoInverse
+  locates all 6 events (5 grade B, 1 grade C). dt.cc tightens the 2019 swarm to ±50 m at
+  depth 14.5 km. **4 grade-A focal mechanisms** — the M3.9 mainshock, two of its 2019
+  aftershocks, AND the 2022 M1.4 recurrence three years later — all on the same
+  near-vertical N–S right-lateral strike-slip plane (strike 194–225°, dip 84–87°, rake
+  ≈ -168°). Notebook 31 cells, 0 errors.
+- **gyeongju regression** — the existing 2017 STP cluster (hand-assembled `ClusterConfig`,
+  pre-dates the new `stp_cluster()` factory) still loads correctly; `wf_source="stp_sac"`,
+  `stp_sac_root` resolves to `201704_Gyeongju_swarm/stp_download/SAC`, `phs_weight_scheme`
+  stays `"distance"` (source-cluster default unchanged).
+- **chungju + changnyeong regression** — both still `wf_source="kma_archive"`,
+  `phs_weight_scheme="probability"`. NECIS path unchanged.
+- **Source-cluster suite** (gwangyang / jangsung / kimcheon) — all still `wf=kma_archive`,
+  `scheme=distance`. No `.phs` regression on the v0.5.0 baselines.
+
+**Notes**
+- The user spotted a subtle data-loss bug during planning: the modern
+  `stations/KP_station_list.csv` doesn't include stations retired between the catalog epoch
+  and now, so a 2017-era event lookup using it would silently miss stations that *were*
+  recording then but aren't on the modern roster. STP's `sta` command returns the
+  historical-inclusive list, which we now use for `--source stp` clusters. The Sangju test
+  found 117 in-radius stations vs 57 with the modern bundle alone — twice the data.
+
 ## 1.0.0 — 2026-05-31
 
 The 1.0 milestone. Two framework features land — AI-pick-probability HypoInverse weighting

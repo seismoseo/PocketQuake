@@ -27,6 +27,7 @@ from typing import Iterable
 from pocketquake import EQCYCLE_DIR
 from pocketquake.scaffold import ClusterSpec, scaffold_all
 from pocketquake.necis_bridge import download_events
+from pocketquake.stp_bridge import download_events_via_stp
 from pocketquake import build_results_nb
 
 
@@ -72,32 +73,53 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 networks: Iterable[str] = ("KS",),
                 picker: str = "phasenet_plus",
                 dtct_isolv: int = 1,
+                wf_backend: str = "necis",
                 run_focal_mechanism: bool = True,
                 skip_download: bool = False,
                 skip_pipeline: bool = False) -> dict:
-    """End-to-end: scaffold → NECIS download → register → eq-cycle pipeline → results notebook.
+    """End-to-end: scaffold → waveform download → register → eq-cycle pipeline → results notebook.
+
+    `wf_backend` picks the waveform source:
+      - "necis": KMA NECIS event-segment archive (post-2020 events, the default).
+      - "stp":   SNU SAC Transfer Protocol via the sgtlab account (older events that NECIS
+                 no longer serves as downloadable segments).
 
     Returns paths/handles of the produced artifacts."""
     region = region or cluster.capitalize()
     spec = ClusterSpec(
         name=cluster, region=region, catalog_csv=catalog_csv,
         epicenter=tuple(epicenter), region_bounds=tuple(region_bounds),
-        networks=tuple(networks), dtct_isolv=dtct_isolv,
+        networks=tuple(networks), dtct_isolv=dtct_isolv, wf_backend=wf_backend,
     )
 
     # 1. scaffold + register (idempotent)
     info = scaffold_all(spec)
-    waveforms_dir = os.path.join(info["src_root"], "kma_waveforms")
+    if wf_backend == "stp":
+        waveforms_dir = os.path.join(info["src_root"], "stp_download", "SAC")
+    else:
+        waveforms_dir = os.path.join(info["src_root"], "kma_waveforms")
     print(f"[pocketquake] cluster scaffolded at {info['src_root']}")
     print(f"[pocketquake] cluster module:  {info['module']}")
     print(f"[pocketquake] config.py changes:  names={info['names_changed']}  src_dirs={info['src_dirs_changed']}")
+    print(f"[pocketquake] wf_backend:     {wf_backend}")
 
-    # 2. NECIS download (per-event SAC layout the eq-cycle reads natively)
+    # 2. waveform download
     if not skip_download:
-        catalog_in_cluster = os.path.join(info["src_root"], "event_catalog", "event_catalog.csv")
-        print(f"\n[pocketquake] downloading waveforms via NECIS → {waveforms_dir}")
-        download_events(catalog_csv=catalog_in_cluster, out_root=waveforms_dir,
-                        data_types=("a", "v"), convert_sac=True)
+        if wf_backend == "stp":
+            print(f"\n[pocketquake] fetching waveforms via STP → {waveforms_dir}")
+            # Re-load the cluster config we just wrote so we get the proper ClusterConfig
+            # with stp_sac_root / radius_km / etc., not the bare ClusterSpec.
+            import importlib, sys
+            if EQCYCLE_DIR not in sys.path:
+                sys.path.insert(0, EQCYCLE_DIR)
+            cluster_mod = importlib.import_module(f"pipeline.clusters.{cluster}")
+            cfg = cluster_mod.CONFIG
+            download_events_via_stp(cfg)
+        else:
+            catalog_in_cluster = os.path.join(info["src_root"], "event_catalog", "event_catalog.csv")
+            print(f"\n[pocketquake] downloading waveforms via NECIS → {waveforms_dir}")
+            download_events(catalog_csv=catalog_in_cluster, out_root=waveforms_dir,
+                            data_types=("a", "v"), convert_sac=True)
     else:
         print("[pocketquake] --skip-download set; assuming waveforms are already in place")
 
@@ -147,9 +169,12 @@ def main(argv: list[str] | None = None) -> None:
                     help="HypoDD dt.ct inversion: 1=SVD (small clusters), 2=LSQR (large)")
     ap.add_argument("--no-focal-mechanism", action="store_true", help="Skip the focal_mechanism stage")
     ap.add_argument("--skip-download", action="store_true",
-                    help="Skip NECIS download (waveforms already exist in the cluster dir)")
+                    help="Skip waveform download (waveforms already exist in the cluster dir)")
     ap.add_argument("--skip-pipeline", action="store_true",
                     help="Skip the eq-cycle pipeline run (debugging the scaffolding / notebook only)")
+    ap.add_argument("--wf-backend", default="necis", choices=("necis", "stp"),
+                    help="Waveform source: necis (KMA NECIS, default, post-2020 events) | "
+                         "stp (SNU SAC Transfer Protocol, older events)")
     args = ap.parse_args(argv)
 
     orchestrate(
@@ -161,6 +186,7 @@ def main(argv: list[str] | None = None) -> None:
         networks=tuple(s.strip() for s in args.networks.split(",") if s.strip()),
         picker=args.picker,
         dtct_isolv=args.dtct_isolv,
+        wf_backend=args.wf_backend,
         run_focal_mechanism=not args.no_focal_mechanism,
         skip_download=args.skip_download,
         skip_pipeline=args.skip_pipeline,
