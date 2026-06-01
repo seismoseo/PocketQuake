@@ -37,6 +37,15 @@ FRAME_FROM = "auto"             # fault-frame plane for sections 4 & 5:
                                 #                 (Uiseong-type cases).
                                 #   "mechanism" — always use the mainshock nodal plane (raises if absent).
 
+# Bootstrap "under-constrained" drop thresholds — events failing any of these are dropped from
+# every dt.cc/dt.ct plot (and from the section/3-D views). Symmetric horizontal + vertical caps;
+# set BOOT_DROP_VERT_KM=None to disable vertical filtering and keep the v1.3.0 behaviour.
+BOOT_DROP_HORIZ_KM = 0.1        # km, max 95% horizontal half-width √(ex95²+ey95²)
+BOOT_DROP_VERT_KM  = 0.1        # km, max 95% vertical half-width ez95 (None disables)
+
+viz.BOOT_DROP_HORIZ_KM = BOOT_DROP_HORIZ_KM
+viz.BOOT_DROP_VERT_KM  = BOOT_DROP_VERT_KM
+
 cfg0 = config.load_cluster(CLUSTER)
 cfg  = config.tune(cfg0, output_root=os.path.join(config.RUNS_ROOT, f"{CLUSTER}{RUN_SUFFIX}")) \
        if RUN_SUFFIX else cfg0
@@ -81,15 +90,28 @@ print("Median 95% bootstrap half-widths (…_boot_m) vs HypoDD internal a-poster
 md("""Per-event diagnostic — the dt.cc events with the largest 95% horizontal error, with their CC/CT link
 counts and `n_boot` (replicas where the event relocated). A large bar with **plenty of links** means the
 event is poorly *determined* (geometry — e.g. shallow + one-sided coverage), not poorly *measured*; such
-events are dropped from the plots below (`viz._boot_underconstrained`).""")
+events are dropped from the plots below (`viz._boot_underconstrained`).
+
+The `horiz_ok` / `vert_ok` / `nboot_ok` flags break down WHY each event was dropped. The drop
+thresholds are the `BOOT_DROP_*_KM` parameters in the params cell — relax them if your cluster has
+genuinely larger uncertainty (e.g. set `BOOT_DROP_VERT_KM=0.5` for shallow swarms where 100 m depth
+control is unrealistic).""")
 co(r"""_bdir = config.dtcc_dir(cfg)
 if os.path.exists(os.path.join(_bdir, "hypoDD.reloc")):
     _bb = hypodd.bootstrap_relocation(cfg, branch="dtcc", n=N_BOOT, seed=BOOT_SEED)
     _rl = sumio.read_reloc(os.path.join(_bdir, "hypoDD.reloc"))[["id","nccp","nccs","nctp","ncts"]]
     _t = _rl.merge(_bb[["id","n_boot","ex95","ey95","ez95"]], on="id")
     _t["horiz95_m"] = _np.hypot(_t.ex95, _t.ey95)
-    _t["dropped"] = _t.id.isin(viz._boot_underconstrained(cfg, "dt.cc"))
-    display(_t.sort_values("horiz95_m", ascending=False).head(6).round(1).reset_index(drop=True))""")
+    _t["ez95_m"]   = _t.ez95
+    # Break down the drop reason for each event
+    _t["horiz_ok"] = _t.horiz95_m <= viz.BOOT_DROP_HORIZ_KM * 1000
+    _t["vert_ok"]  = (viz.BOOT_DROP_VERT_KM is None) | (_t.ez95_m <= (viz.BOOT_DROP_VERT_KM or 1e9) * 1000)
+    _t["nboot_ok"] = _t.n_boot >= viz.BOOT_DROP_MIN_NBOOT_FRAC * N_BOOT
+    _t["dropped"]  = _t.id.isin(viz._boot_underconstrained(cfg, "dt.cc"))
+    display(_t.sort_values("horiz95_m", ascending=False)
+            [["id","nccp","nccs","nctp","ncts","n_boot","horiz95_m","ez95_m",
+              "horiz_ok","vert_ok","nboot_ok","dropped"]]
+            .head(6).round(1).reset_index(drop=True))""")
 
 md("""### Final relocation table — locations + bootstrap 95% errors
 

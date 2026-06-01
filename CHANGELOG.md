@@ -3,6 +3,40 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.3.1 — 2026-06-01
+
+Adds a vertical (depth) component to the bootstrap "under-constrained" drop filter — the
+v1.3.0 behaviour only checked horizontal half-width, but the depth uncertainty is
+systematically much larger and often the deciding factor on shallow / one-sided clusters
+(haman: 80–300 m horizontal vs 500–1400 m vertical). Driven by the Taean notebook, where
+one event passed the horizontal cap at 93.7 m but had ez95 = 187 m and was kept anyway.
+
+**Added**
+- **`viz.BOOT_DROP_VERT_KM`** module constant (default `0.1` km, symmetric with the
+  horizontal cap). Extends `viz._boot_underconstrained` to OR in `ez95/1000 > BOOT_DROP_VERT_KM`.
+  Set `viz.BOOT_DROP_VERT_KM = None` to disable vertical filtering and keep the v1.3.0
+  behaviour exactly.
+- **`BOOT_DROP_HORIZ_KM` / `BOOT_DROP_VERT_KM` exposed in the notebook params block** with
+  in-cell wiring `viz.BOOT_DROP_HORIZ_KM = BOOT_DROP_HORIZ_KM` etc., so every cluster can
+  override per-notebook without touching the framework.
+- **`horiz_ok` / `vert_ok` / `nboot_ok` breakdown columns in the bootstrap diagnostic table**
+  (the cell right after the cached-bootstrap summary). The table now explicitly says WHY
+  each event was dropped — `dropped=True` paired with `vert_ok=False` flags a depth-only
+  failure mode the v1.3.0 table couldn't surface.
+
+**Changed (potentially breaking)**
+- The 100 m default for `BOOT_DROP_VERT_KM` is strict and **will drop additional events** on
+  any cluster with realistic depth uncertainty above 100 m (most non-doublet clusters).
+  Already-scaffolded notebooks (haman, uiseong, sangju, chungju, …) that don't override
+  the constant will see new drops on re-execute. To keep v1.3.0 behaviour, set
+  `BOOT_DROP_VERT_KM = None` in the params block of the affected notebook.
+
+**Verified**
+- Taean re-executed (35 cells, 0 errors, 13 s with cached bootstrap). Event 200010 with
+  horiz=93.7 m / ez95=187 m newly drops on vertical; events 200000 + 200015 still drop on
+  horizontal; the well-located events (200012, 200007, 200003, 200013, 200002) all keep
+  the `True/True/True/False` pattern and stay.
+
 ## 1.3.0 — 2026-05-31
 
 Two features driven by the haman + uiseong notebooks.
