@@ -46,6 +46,16 @@ BOOT_DROP_VERT_KM  = 0.1        # km, max 95% vertical half-width ez95 (None dis
 viz.BOOT_DROP_HORIZ_KM = BOOT_DROP_HORIZ_KM
 viz.BOOT_DROP_VERT_KM  = BOOT_DROP_VERT_KM
 
+# Reference-mechanism selection for sections 4 & 5 (drives the beachball, the section plane
+# when FRAME_FROM="auto"/"mechanism", and the title string).
+#   "highest_quality"  — pick the best-graded mechanism first (A → B → C → D); within the
+#                        best-available grade, largest magnitude wins. So a grade-A M1.2 is
+#                        preferred to a grade-B M1.4 — quality always beats magnitude.
+#   "largest_magnitude" — legacy v1.3.1 behaviour: pick the largest magnitude inside the
+#                         cfg.fm_quality_keep pool (typically A+B unified). Use this if you
+#                         specifically want the mainshock regardless of grade.
+MECH_SELECT = "highest_quality"
+
 cfg0 = config.load_cluster(CLUSTER)
 cfg  = config.tune(cfg0, output_root=os.path.join(config.RUNS_ROOT, f"{CLUSTER}{RUN_SUFFIX}")) \
        if RUN_SUFFIX else cfg0
@@ -262,7 +272,7 @@ strong but the mechanism is small/unreliable — e.g. Uiseong, where a clear N-S
 disagrees with the grade-B mainshock's nodal strike); `"mechanism"` always uses the mechanism.
 Pass `strike=`/`dip=` to override entirely. A tight across-strike spread indicates a near-planar
 fault.""")
-co(r"""viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM); plt.show()""")
+co(r"""viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT); plt.show()""")
 
 md("""## 5. Seismicity in 3-D (interactive)
 
@@ -270,7 +280,7 @@ md("""## 5. Seismicity in 3-D (interactive)
 coloured by origin time, sized by magnitude) with the SVD best-fit fault plane overlaid as a translucent
 patch — rotate/zoom to judge planarity and dip. (Interactivity is live in a running notebook; committed
 notebooks are output-stripped, and a static export needs the optional `kaleido` package.)""")
-co(r"""fig3d = viz.plot_3d_plane(cfg, VELMODEL, frame_from=FRAME_FROM)
+co(r"""fig3d = viz.plot_3d_plane(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT)
 try:                                  # optional static export (needs kaleido); harmless if absent
     fig3d.write_image(f"/tmp/{CLUSTER}_3d.png", scale=2)
 except Exception as _e:
@@ -280,7 +290,7 @@ md("""The same view with the per-event uncertainty drawn as a **95% bootstrap er
 (`error="ellipsoid"`) instead of whisker bars: each ellipsoid's shape is the bootstrap sample covariance
 and its size the empirical 95% Mahalanobis radius (95% of replicas inside), coloured like its hypocentre.
 Tight horizontal but loose depth control shows up as a vertically elongated ellipsoid.""")
-co(r"""fig3d_e = viz.plot_3d_plane(cfg, VELMODEL, error="ellipsoid", frame_from=FRAME_FROM)
+co(r"""fig3d_e = viz.plot_3d_plane(cfg, VELMODEL, error="ellipsoid", frame_from=FRAME_FROM, mech_select=MECH_SELECT)
 try:
     fig3d_e.write_image(f"/tmp/{CLUSTER}_3d_ellipsoid.png", scale=2)
 except Exception:

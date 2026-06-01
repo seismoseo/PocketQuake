@@ -3,6 +3,43 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.3.2 — 2026-06-01
+
+Fixes the focal-mechanism selection used by `fault_sections` and `plot_3d_plane` so a
+**small grade-A** mechanism is preferred to a **larger grade-B** one. The v1.3.1
+`_fault_ref` picked the largest magnitude inside the unified A+B pool, ignoring the
+A-vs-B distinction; for clusters with mixed grades the resulting beachball + section
+plane could come from the less reliable solution.
+
+Found via the Hampyeong notebook: a grade-A M1.2 (strike 68° / dip 78°) was being
+ignored in favour of a grade-B M1.4 (strike 213° / dip 87°). 145° difference in
+strike, completely different fault geometry.
+
+**Added**
+- **`mech_select`** kwarg on `viz._fault_ref`, `viz._mechanism_plane`,
+  `viz.fault_sections`, `viz.plot_3d_plane`. Accepted values:
+  - `"highest_quality"` (NEW DEFAULT): scan grades A → B → C → D; within the
+    best-available grade, largest magnitude wins. Quality always beats magnitude.
+  - `"largest_magnitude"`: legacy v1.3.1 behaviour. Largest magnitude inside
+    `cfg.fm_quality_keep` (typically A+B as a unified pool); use this if you
+    specifically want the mainshock regardless of grade.
+- **`MECH_SELECT` exposed in the notebook params block** (template + Hampyeong)
+  with documentation pointing to the v1.3.1 vs v1.3.2 behaviour difference.
+
+**Changed (backward-incompatible default flip)**
+- For any cluster where the largest-magnitude A+B event is grade B and a smaller
+  grade-A event exists, the beachball + section header + 3-D centring will change
+  to use the grade-A event. Set `MECH_SELECT = "largest_magnitude"` in the params
+  block to keep the v1.3.1 behaviour exactly.
+
+**Verified**
+- Hampyeong notebook re-executed (35 cells, 0 errors). fault_sections title was
+  "mechanism 213°/87° (B)" under v1.3.1, now correctly shows
+  "mechanism 68°/78° (A)" — the grade-A M1.2 from 2025-01-01.
+- `_fault_ref` regression check on clusters whose mainshock IS grade A (gwangyang,
+  sangju, haman) → unchanged selection (mainshock is the grade-A AND the largest;
+  both modes agree).
+
 ## 1.3.1 — 2026-06-01
 
 Adds a vertical (depth) component to the bootstrap "under-constrained" drop filter — the
