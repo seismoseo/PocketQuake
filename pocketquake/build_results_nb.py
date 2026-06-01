@@ -289,7 +289,7 @@ notebook via `IPython.display.HTML`. Buyeo's 14-event cluster spans 2022-11-29 â
 co(r"""# 4-panel cumulative time-lapse in the same fault frame as section 4
 from IPython.display import HTML
 _anim = viz.animate_seismicity(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT,
-                                fps=8, return_html=True)
+                                return_html=True)
 _anim    # inline HTML5 player; the GIF also sits at <output_root>/<cluster>_seismicity.gif""")
 
 md("""## 5. Seismicity in 3-D (interactive)

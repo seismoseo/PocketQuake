@@ -165,7 +165,8 @@ def _stations_within_radius(cfg, networks: tuple[str, ...]) -> pd.DataFrame:
 
 def _build_batch(cfg, stations: pd.DataFrame, *,
                  window_pre_s: float, window_total_s: float,
-                 sensor_bands: tuple[str, ...]) -> str:
+                 sensor_bands: tuple[str, ...],
+                 skip_existing_station: bool = False) -> str:
     """Build the STP batch: for each event * sensor band, emit one `dir <out>` then one
     `win NET CODE BAND_ YYYY/MM/DD,HH:MM:SS.FFFFFF <total>s` per in-radius station.
 
@@ -187,6 +188,14 @@ def _build_batch(cfg, stations: pd.DataFrame, *,
             outdir = os.path.join(sac_root, eid, band)
             lines.append(f"dir {outdir}")
             for _, s in stations.iterrows():
+                if skip_existing_station and os.path.isdir(outdir):
+                    # Skip stations whose SAC files for this (event, band) already exist.
+                    # Used to fetch DELTA station-network rosters (e.g. add KG to an existing
+                    # KS-only download) without re-paying for KS waveforms we already have.
+                    # The STP `dir` line above is still emitted — harmless if no `win` follows.
+                    import glob as _glob
+                    if _glob.glob(os.path.join(outdir, f"*.{s.Network}.{s.Code}.*.sac")):
+                        continue
                 lines.append(f"win {s.Network} {s.Code} {band}_ {stp_time} {int(window_total_s)}s")
     return "\n".join(lines)
 
@@ -194,7 +203,8 @@ def _build_batch(cfg, stations: pd.DataFrame, *,
 def download_events_via_stp(cfg, *, user: Optional[str] = None, pw: Optional[str] = None,
                             window_pre_s: float = 30.0, window_total_s: float = 500.0,
                             sensor_bands: tuple[str, ...] = ("HH", "HG", "EL"),
-                            networks: Iterable[str] = ("KS", "KG")) -> dict:
+                            networks: Iterable[str] = ("KS", "KG"),
+                            skip_existing_station: bool = False) -> dict:
     """Fetch per-event SAC trees via STP, return {event_id: n_sacs}.
 
     Writes:
@@ -217,7 +227,8 @@ def download_events_via_stp(cfg, *, user: Optional[str] = None, pw: Optional[str
     batch_path = os.path.join(batch_dir, "stp_batch.txt")
     batch = _build_batch(cfg, stations,
                          window_pre_s=window_pre_s, window_total_s=window_total_s,
-                         sensor_bands=tuple(sensor_bands))
+                         sensor_bands=tuple(sensor_bands),
+                         skip_existing_station=skip_existing_station)
     with open(batch_path, "w") as f:
         f.write(batch + "\n")
     print(f"[stp_bridge] wrote batch -> {batch_path} ({len(batch.splitlines())} lines)")
