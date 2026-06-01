@@ -70,7 +70,7 @@ def _execute_notebook(path: str, timeout: int = 3600) -> None:
 def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 region_bounds: tuple[float, float, float, float], *,
                 region: str | None = None,
-                networks: Iterable[str] = ("KS",),
+                networks: Iterable[str] | None = None,
                 picker: str = "phasenet_plus",
                 dtct_isolv: int = 1,
                 wf_backend: str = "necis",
@@ -84,7 +84,16 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
       - "stp":   SNU SAC Transfer Protocol via the sgtlab account (older events that NECIS
                  no longer serves as downloadable segments).
 
+    `networks` is the station-network roster. **`None` resolves to a backend-appropriate default**:
+      - `wf_backend="necis"` → `("KS",)`  — NECIS only bundles KS in its event-segment zips.
+      - `wf_backend="stp"`   → `("KS", "KG")`  — STP serves BOTH networks for the same event,
+        and dropping KG would lose ~60 stations of azimuthal coverage on every cluster, which
+        matters most for focal-mechanism inversions. Pass `networks=("KS",)` to revert to the
+        v1.4.2 single-network behaviour.
+
     Returns paths/handles of the produced artifacts."""
+    if networks is None:
+        networks = ("KS", "KG") if wf_backend == "stp" else ("KS",)
     region = region or cluster.capitalize()
     spec = ClusterSpec(
         name=cluster, region=region, catalog_csv=catalog_csv,
@@ -114,7 +123,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 sys.path.insert(0, EQCYCLE_DIR)
             cluster_mod = importlib.import_module(f"pipeline.clusters.{cluster}")
             cfg = cluster_mod.CONFIG
-            download_events_via_stp(cfg)
+            # Pass the resolved networks tuple so the STP `win` commands include KG (default
+            # for stp backend) — otherwise stp_bridge.download_events_via_stp's own default
+            # of ("KS","KG") could silently disagree with the scaffold's station-table coverage.
+            download_events_via_stp(cfg, networks=tuple(spec.networks))
         else:
             catalog_in_cluster = os.path.join(info["src_root"], "event_catalog", "event_catalog.csv")
             print(f"\n[pocketquake] downloading waveforms via NECIS → {waveforms_dir}")
@@ -161,8 +173,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--region-bounds", required=True,
                     type=lambda s: _parse_pair(s, 4, "--region-bounds"),
                     help="Box as 'lat0,lat1,lon0,lon1' (e.g. 35.3,35.65,128.25,128.65)")
-    ap.add_argument("--networks", default="KS",
-                    help="Comma-separated station networks to bundle (default: KS)")
+    ap.add_argument("--networks", default=None,
+                    help="Comma-separated station networks to bundle. "
+                         "Default depends on --wf-backend: NECIS → 'KS' (only network NECIS bundles); "
+                         "STP → 'KS,KG' (both networks are in the STP archive, and KG roughly "
+                         "doubles azimuthal coverage on the southeastern peninsula). "
+                         "Pass --networks=KS to force single-network on either backend.")
     ap.add_argument("--picker", default="phasenet_plus", choices=("stead", "phasenet_plus"),
                     help="PhaseNet weights to use for picking")
     ap.add_argument("--dtct-isolv", type=int, default=1, choices=(1, 2),
@@ -183,7 +199,8 @@ def main(argv: list[str] | None = None) -> None:
         epicenter=args.epicenter,
         region_bounds=args.region_bounds,
         region=args.region,
-        networks=tuple(s.strip() for s in args.networks.split(",") if s.strip()),
+        networks=(tuple(s.strip() for s in args.networks.split(",") if s.strip())
+                  if args.networks else None),
         picker=args.picker,
         dtct_isolv=args.dtct_isolv,
         wf_backend=args.wf_backend,
