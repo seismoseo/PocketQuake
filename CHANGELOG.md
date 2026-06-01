@@ -3,6 +3,37 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.4.0 — 2026-06-01
+
+Adds a cumulative seismicity time-lapse animation in the same 4-panel fault-frame
+layout as `viz.fault_sections`. Driven by the Buyeo cluster, where 14 events over
+3.3 years show a bursty temporal pattern that a static snapshot can't capture.
+
+**Added**
+- **`viz.animate_seismicity(cfg, velmodel=None, *, frame_from, mech_select, fps=8,
+  frames=None, out_path=None, return_html=False)`** — `matplotlib.animation.FuncAnimation`
+  in the same 2×2 layout as `fault_sections` (fault-plane map / along-strike depth /
+  across-strike depth / fault-plane view). Each frame is the cumulative set of events
+  with origin time ≤ t, where t walks the full time-span in ~`2·n_events` equal steps
+  (capped at 60 frames). The strike + dip line, beachball, and dip-line are static;
+  hypocentre scatter + title clock evolve with t. Saves an animated GIF via
+  `PillowWriter` (no ffmpeg/imageio needed) and optionally returns embeddable HTML.
+- **New "Seismicity time-lapse" cell in the generated notebook** between section 4
+  (`fault_sections`) and section 5 (`plot_3d_plane`). Every freshly-scaffolded
+  cluster gets it automatically.
+
+**Docs**
+- `external/korea-cluster-relocation/CLAUDE.md` updated to document
+  `viz.BOOT_DROP_VERT_KM` (v1.3.1) and the `mech_select` parameter on
+  `fault_sections` / `plot_3d_plane` (v1.3.2). These were absent from the
+  framework's living docs even after the features shipped.
+
+**Verified**
+- Buyeo notebook re-executed (37 cells, 0 errors). `runs/buyeo/buyeo_seismicity.gif`
+  is 481 KB, 26 frames at 8 fps (~3.2 s playback); the inline HTML5 player renders
+  in JupyterLab; the static overlays (strike line, beachball, dip line) match
+  section 4's `fault_sections` output.
+
 ## 1.3.2 — 2026-06-01
 
 Fixes the focal-mechanism selection used by `fault_sections` and `plot_3d_plane` so a

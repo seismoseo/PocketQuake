@@ -274,6 +274,24 @@ Pass `strike=`/`dip=` to override entirely. A tight across-strike spread indicat
 fault.""")
 co(r"""viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT); plt.show()""")
 
+md("""### Seismicity time-lapse animation
+
+`animate_seismicity` replays the same 4-panel fault-frame layout as section 4 above
+**frame-by-frame in chronological order**: each frame is the cumulative set of events
+with origin time ≤ t, where t walks from the cluster's first origin to its last in
+~`2·n_events` equal steps (capped at 60 frames). The strike + dip line, beachball, and
+dip-line are static (computed once from the full event set); the hypocentre scatter
+and clock-in-the-title evolve with t.
+
+Output: an animated GIF saved next to the run outputs and rendered inline in the
+notebook via `IPython.display.HTML`. Buyeo's 14-event cluster spans 2022-11-29 →
+2026-03-05 (3.3 years) — the time-lapse makes its bursty temporal pattern obvious.""")
+co(r"""# 4-panel cumulative time-lapse in the same fault frame as section 4
+from IPython.display import HTML
+_anim = viz.animate_seismicity(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT,
+                                fps=8, return_html=True)
+_anim    # inline HTML5 player; the GIF also sits at <output_root>/<cluster>_seismicity.gif""")
+
 md("""## 5. Seismicity in 3-D (interactive)
 
 `plot_3d_plane` returns an **interactive plotly** 3-D view of the dt.cc hypocentres (relative E–N–depth km,
