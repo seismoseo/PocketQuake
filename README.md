@@ -2,9 +2,9 @@
 
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
-![Chungju Feb 2025 — PocketQuake output: 4 located events + focal mechanisms](examples/chungju/figures/01_map_mechanisms.png)
+![Chungju Feb 2025 — 4-event time-lapse animation in the fault frame](examples/chungju/figures/00_seismicity_animation.gif)
 
-*The PocketQuake output for the 4-event [Chungju Feb 2025 sequence](examples/chungju/README.md) — located events (depth-coloured dots) and SKHASH focal-mechanism beachballs (A/B/C grades) on a leader-line ring. All four solutions converge on a near-vertical N–S right-lateral strike-slip plane. **One command from a 4-line CSV to this figure: `./pocketquake.sh examples/chungju/chungju_catalog.csv chungju --fg`** (~15 min wall-clock).*
+*The PocketQuake output for the 4-event [Chungju Feb 2025 sequence](examples/chungju/README.md) — a cumulative time-lapse animation in the same 2×2 fault-frame layout as `viz.fault_sections`: events appear in chronological order on top of the focal-mechanism beachball (A grade, near-vertical N–S right-lateral strike-slip). **One command from a 4-line CSV to this animation + the rest of the [results notebook](external/korea-cluster-relocation/pipeline/notebooks/03_results_chungju.ipynb): `./pocketquake.sh examples/chungju/chungju_catalog.csv chungju --fg`** (~15 min wall-clock).*
 
 PocketQuake glues two existing projects:
 
