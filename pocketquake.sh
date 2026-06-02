@@ -10,6 +10,8 @@
 #   --picker {phasenet_plus|stead}  picker model (default: phasenet_plus)
 #   --mainshock UTC_YYYYMMDDHHMMSS  also run Gwangyang-style mainshock treatment after the
 #                                   default pipeline (re-runs xcorr→dtcc, builds a _main notebook)
+#   --cores N                       cap xcorr workers (forwarded as --cores N to the eq-cycle
+#                                   CLI; default: each cluster's cfg.num_cores, typically 10)
 #   --fg                            run in foreground (default: nohup background)
 #   -h, --help                      show this and exit
 #
@@ -51,6 +53,9 @@ OPTIONS
                                   useful for re-running treatment on an existing cluster
                                   without redoing scaffold / download / picking / location.
                                   Requires --mainshock.
+  --cores N                       cap xcorr workers (forwarded to the eq-cycle CLI's --cores;
+                                  default: each cluster's cfg.num_cores, typically 10). Set lower
+                                  on memory-constrained boxes (~24 GB/worker observed).
   --fg                            run in foreground (default: nohup background)
   -h, --help                      show this and exit
 
@@ -62,6 +67,9 @@ EXAMPLES
   ./pocketquake.sh ~/catalogs/myswarm.csv myswarm \
       --epi 35.46,128.43 --bounds 35.3,35.65,128.25,128.65 \
       --mainshock 20240912144719 --fg
+
+  # 3. limit xcorr to 6 workers (memory-constrained box):
+  ./pocketquake.sh ~/catalogs/myswarm.csv myswarm --cores 6 --fg
 
 OUTPUT
   external/korea-cluster-relocation/pipeline/notebooks/03_results_<slug>.ipynb
@@ -75,7 +83,7 @@ hdr(){ echo; echo "▸ $*"; }
 # ---- arguments ----
 [[ $# -lt 2 ]] && usage 1
 CATALOG="$1"; SLUG="$2"; shift 2
-EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0
+EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
@@ -84,6 +92,7 @@ while [[ $# -gt 0 ]]; do
         --source)          SOURCE="$2"; shift 2 ;;
         --mainshock)       MAINSHOCK="$2"; shift 2 ;;
         --mainshock-only)  MAIN_ONLY=1; shift ;;
+        --cores)           CORES="$2"; shift 2 ;;
         --fg|--foreground) FG=1; shift ;;
         -h|--help)         usage 0 ;;
         *) fail "unknown option: $1" ;;
@@ -141,6 +150,7 @@ ok "epicenter:   $EPI"
 ok "region-bbox: $BBOX"
 ok "picker:      $PICKER"
 ok "source:      $SOURCE"
+[[ -n "$CORES"     ]] && ok "cores:       $CORES (xcorr worker cap)"
 [[ -n "$MAINSHOCK" ]] && ok "mainshock:   $MAINSHOCK (treatment will be applied after default run)"
 
 # ---- the orchestrator command ----
@@ -152,6 +162,7 @@ CMD=(
     --picker "$PICKER"
     --wf-backend "$SOURCE"
 )
+[[ -n "$CORES" ]] && CMD+=(--cores "$CORES")
 LOG="$HERE/${SLUG}_run.log"
 
 cd "$HERE"
