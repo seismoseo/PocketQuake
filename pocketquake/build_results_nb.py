@@ -271,8 +271,18 @@ mainshock's nodal plane (NP1/NP2 matched to SVD strike) when a grade-A/B mechani
 strong but the mechanism is small/unreliable — e.g. Uiseong, where a clear N-S aftershock streak
 disagrees with the grade-B mainshock's nodal strike); `"mechanism"` always uses the mechanism.
 Pass `strike=`/`dip=` to override entirely. A tight across-strike spread indicates a near-planar
-fault.""")
-co(r"""viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT); plt.show()""")
+fault.
+
+Two views are rendered side-by-side: (a) the **simple hypoDD.reloc** (SOTA default — every event
+shown, no bootstrap drops, no error bars), and (b) the **bootstrap diagnostic** (drops the
+under-constrained events and overlays the 95 % bootstrap error bars). Same fault-frame plane on
+both so you can see which events the bootstrap filter would remove and how big each event's
+relative-location spread is.""")
+co(r"""print("=== (a) simple hypoDD.reloc — SOTA default (show_bootstrap=False) ===")
+viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT); plt.show()
+print("=== (b) bootstrap diagnostic — drops + 95% error bars ===")
+viz.fault_sections(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select=MECH_SELECT,
+                   show_bootstrap=True); plt.show()""")
 
 md("""### Seismicity time-lapse animation
 
