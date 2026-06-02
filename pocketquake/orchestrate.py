@@ -76,7 +76,8 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 wf_backend: str = "necis",
                 run_focal_mechanism: bool = True,
                 skip_download: bool = False,
-                skip_pipeline: bool = False) -> dict:
+                skip_pipeline: bool = False,
+                cores: int | None = None) -> dict:
     """End-to-end: scaffold → waveform download → register → eq-cycle pipeline → results notebook.
 
     `wf_backend` picks the waveform source:
@@ -137,8 +138,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
 
     # 3. eq-cycle pipeline through dt.cc
     if not skip_pipeline:
-        print("\n[pocketquake] running the eq-cycle relocation chain")
-        _run_eqcycle_stage(cluster, through="dtcc", picker=picker)
+        extra = ["--cores", str(cores)] if cores is not None else None
+        print("\n[pocketquake] running the eq-cycle relocation chain"
+              + (f"  (xcorr workers capped at {cores})" if cores is not None else ""))
+        _run_eqcycle_stage(cluster, through="dtcc", picker=picker, extra=extra)
 
         # 4. focal mechanisms (separate stage; PhaseNet+ picks already exist)
         if run_focal_mechanism:
@@ -191,6 +194,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--wf-backend", default="necis", choices=("necis", "stp"),
                     help="Waveform source: necis (KMA NECIS, default, post-2020 events) | "
                          "stp (SNU SAC Transfer Protocol, older events)")
+    ap.add_argument("--cores", type=int, default=None,
+                    help="Worker cap for the eq-cycle xcorr stage. Forwarded as `--cores N` to "
+                         "`pipeline.cli.run_pipeline`, which uses a ProcessPoolExecutor capped at "
+                         "min(N, |sched_getaffinity|). Default (None) → uses each cluster's "
+                         "`cfg.num_cores` (typically 10). Set lower on memory-constrained boxes "
+                         "(observed: ~24 GB / worker on Yeoncheon's dt.cc xcorr).")
     args = ap.parse_args(argv)
 
     orchestrate(
@@ -207,6 +216,7 @@ def main(argv: list[str] | None = None) -> None:
         run_focal_mechanism=not args.no_focal_mechanism,
         skip_download=args.skip_download,
         skip_pipeline=args.skip_pipeline,
+        cores=args.cores,
     )
 
 
