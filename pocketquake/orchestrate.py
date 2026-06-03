@@ -29,6 +29,7 @@ from pocketquake.scaffold import ClusterSpec, scaffold_all
 from pocketquake.necis_bridge import download_events
 from pocketquake.stp_bridge import download_events_via_stp
 from pocketquake import build_results_nb
+from pocketquake import source_dispatch
 
 
 # --------------------------------------------------------------- helpers
@@ -66,6 +67,78 @@ def _execute_notebook(path: str, timeout: int = 3600) -> None:
           f"--ExecutePreprocessor.timeout={timeout}", path])
 
 
+def _load_cluster_cfg(cluster: str):
+    """Re-load the just-written cluster config so we get the ClusterConfig (with
+    stp_sac_root / radius_km / etc.), not the bare ClusterSpec."""
+    import importlib
+    if EQCYCLE_DIR not in sys.path:
+        sys.path.insert(0, EQCYCLE_DIR)
+    cluster_mod = importlib.import_module(f"pipeline.clusters.{cluster}")
+    return cluster_mod.CONFIG
+
+
+def _download_stp_for_cluster(cluster: str, *, networks: tuple[str, ...],
+                              catalog_csv_override: str | None = None) -> None:
+    """Single-source STP fetch — used directly by `--source stp` and as the first half
+    of mixed mode. `catalog_csv_override` lets the mixed orchestrator point STP at a
+    subset CSV (cutoff-eligible events only) instead of the full cluster catalog."""
+    cfg = _load_cluster_cfg(cluster)
+    if catalog_csv_override:
+        # stp_bridge reads from cfg.event_catalog_csv; override transiently via dataclasses.replace
+        from dataclasses import replace as dc_replace
+        cfg = dc_replace(cfg, event_catalog_csv=catalog_csv_override)
+    download_events_via_stp(cfg, networks=networks)
+
+
+def _download_mixed_for_cluster(cluster: str, *, spec, info: dict,
+                                catalog_csv: str, stp_cutoff: str | None) -> None:
+    """Mixed-source orchestration: STP for the early subset, NECIS for the rest.
+
+    Two modes:
+      - `stp_cutoff` set → split catalog by UTC origin time first; STP gets the < cutoff
+        events, NECIS gets the ≥ cutoff events. No wasted STP round-trips.
+      - `stp_cutoff` None → try STP over the FULL catalog (STP silently returns nothing
+        for late events), then determine which event_ids came back empty and fetch those
+        via NECIS. Robust to drift in STP's coverage frontier without manual tuning.
+    """
+    src_root = info["src_root"]
+    stp_sac_root = os.path.join(src_root, "stp_download", "SAC")
+    necis_root = os.path.join(src_root, "kma_waveforms")
+    tmp_dir = os.path.join(src_root, "event_catalog")
+    stp_sub_csv = os.path.join(tmp_dir, "event_catalog_stp.csv")
+    necis_sub_csv = os.path.join(tmp_dir, "event_catalog_necis.csv")
+
+    if stp_cutoff:
+        print(f"\n[pocketquake] mixed mode — strict date cutoff at {stp_cutoff} (UTC)")
+        stp_df, necis_df = source_dispatch.split_by_cutoff(catalog_csv, stp_cutoff)
+        print(f"  STP-eligible (UTC origin < {stp_cutoff}): {len(stp_df)} events")
+        print(f"  NECIS-only   (UTC origin ≥ {stp_cutoff}): {len(necis_df)} events")
+        source_dispatch.write_subset(stp_df, stp_sub_csv)
+        source_dispatch.write_subset(necis_df, necis_sub_csv)
+        if len(stp_df):
+            print(f"\n[pocketquake] fetching {len(stp_df)} early events via STP → {stp_sac_root}")
+            _download_stp_for_cluster(cluster, networks=tuple(spec.networks),
+                                      catalog_csv_override=stp_sub_csv)
+        if len(necis_df):
+            print(f"\n[pocketquake] fetching {len(necis_df)} late events via NECIS → {necis_root}")
+            download_events(catalog_csv=necis_sub_csv, out_root=necis_root,
+                            data_types=("a", "v"), convert_sac=True)
+        return
+
+    # Default mode: try STP over the full catalog, NECIS-fallback for events that came back empty.
+    print(f"\n[pocketquake] mixed mode — try-STP-first, NECIS fallback (no cutoff)")
+    print(f"[pocketquake] attempting STP for all {sum(1 for _ in open(catalog_csv)) - 1} events → {stp_sac_root}")
+    _download_stp_for_cluster(cluster, networks=tuple(spec.networks))
+    failed = source_dispatch.find_failed_events(stp_sac_root, catalog_csv)
+    print(f"\n[pocketquake] STP empty for {len(failed)} events — falling back to NECIS")
+    if len(failed):
+        source_dispatch.write_subset(failed, necis_sub_csv)
+        download_events(catalog_csv=necis_sub_csv, out_root=necis_root,
+                        data_types=("a", "v"), convert_sac=True)
+    else:
+        print("  (every event got SACs from STP — no NECIS fetch needed)")
+
+
 # --------------------------------------------------------------- the orchestrator
 def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 region_bounds: tuple[float, float, float, float], *,
@@ -74,6 +147,7 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 picker: str = "phasenet_plus",
                 dtct_isolv: int = 1,
                 wf_backend: str = "necis",
+                stp_cutoff: str | None = None,
                 run_focal_mechanism: bool = True,
                 skip_download: bool = False,
                 skip_pipeline: bool = False,
@@ -84,6 +158,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
       - "necis": KMA NECIS event-segment archive (post-2020 events, the default).
       - "stp":   SNU SAC Transfer Protocol via the sgtlab account (older events that NECIS
                  no longer serves as downloadable segments).
+      - "mixed": split per-event between STP and NECIS so a single catalog can span the
+                 transition. Default routing is **try-STP-first with NECIS fallback** for
+                 every event; pass `stp_cutoff="YYYY-MM-DD"` to instead skip STP for events
+                 with UTC origin ≥ cutoff (no failed-STP round-trips for known-late events).
 
     `networks` is the station-network roster. **`None` resolves to a backend-appropriate default**:
       - `wf_backend="necis"` → `("KS",)`  — NECIS only bundles KS in its event-segment zips.
@@ -91,10 +169,13 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         and dropping KG would lose ~60 stations of azimuthal coverage on every cluster, which
         matters most for focal-mechanism inversions. Pass `networks=("KS",)` to revert to the
         v1.4.2 single-network behaviour.
+      - `wf_backend="mixed"` → `("KS", "KG")` — the STP-half of the catalog gains KG just like
+        a pure STP cluster; the NECIS-half is KS-only natively (NECIS event ZIPs do not bundle
+        KG). The eq-cycle station table comes from STP so it's the historical-inclusive roster.
 
     Returns paths/handles of the produced artifacts."""
     if networks is None:
-        networks = ("KS", "KG") if wf_backend == "stp" else ("KS",)
+        networks = ("KS",) if wf_backend == "necis" else ("KS", "KG")
     region = region or cluster.capitalize()
     spec = ClusterSpec(
         name=cluster, region=region, catalog_csv=catalog_csv,
@@ -106,30 +187,29 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
     info = scaffold_all(spec)
     if wf_backend == "stp":
         waveforms_dir = os.path.join(info["src_root"], "stp_download", "SAC")
+    elif wf_backend == "mixed":
+        # Mixed clusters live in BOTH trees; report the STP root as the "primary" handle
+        # but the orchestrator fetches into both below.
+        waveforms_dir = os.path.join(info["src_root"], "stp_download", "SAC")
     else:
         waveforms_dir = os.path.join(info["src_root"], "kma_waveforms")
     print(f"[pocketquake] cluster scaffolded at {info['src_root']}")
     print(f"[pocketquake] cluster module:  {info['module']}")
     print(f"[pocketquake] config.py changes:  names={info['names_changed']}  src_dirs={info['src_dirs_changed']}")
-    print(f"[pocketquake] wf_backend:     {wf_backend}")
+    print(f"[pocketquake] wf_backend:     {wf_backend}"
+          + (f"  (stp_cutoff={stp_cutoff})" if wf_backend == "mixed" and stp_cutoff else ""))
 
     # 2. waveform download
     if not skip_download:
+        catalog_in_cluster = os.path.join(info["src_root"], "event_catalog", "event_catalog.csv")
         if wf_backend == "stp":
             print(f"\n[pocketquake] fetching waveforms via STP → {waveforms_dir}")
-            # Re-load the cluster config we just wrote so we get the proper ClusterConfig
-            # with stp_sac_root / radius_km / etc., not the bare ClusterSpec.
-            import importlib, sys
-            if EQCYCLE_DIR not in sys.path:
-                sys.path.insert(0, EQCYCLE_DIR)
-            cluster_mod = importlib.import_module(f"pipeline.clusters.{cluster}")
-            cfg = cluster_mod.CONFIG
-            # Pass the resolved networks tuple so the STP `win` commands include KG (default
-            # for stp backend) — otherwise stp_bridge.download_events_via_stp's own default
-            # of ("KS","KG") could silently disagree with the scaffold's station-table coverage.
-            download_events_via_stp(cfg, networks=tuple(spec.networks))
+            _download_stp_for_cluster(cluster, networks=tuple(spec.networks))
+        elif wf_backend == "mixed":
+            _download_mixed_for_cluster(cluster, spec=spec, info=info,
+                                        catalog_csv=catalog_in_cluster,
+                                        stp_cutoff=stp_cutoff)
         else:
-            catalog_in_cluster = os.path.join(info["src_root"], "event_catalog", "event_catalog.csv")
             print(f"\n[pocketquake] downloading waveforms via NECIS → {waveforms_dir}")
             download_events(catalog_csv=catalog_in_cluster, out_root=waveforms_dir,
                             data_types=("a", "v"), convert_sac=True)
@@ -149,10 +229,17 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
             _run_eqcycle_stage(cluster, stage_from="focal_mechanism",
                                through="focal_mechanism", picker=picker)
 
-    # 5. build + execute the results notebook
-    print("\n[pocketquake] generating + executing the results notebook")
-    nb_path = build_results_nb.build(cluster)
-    _execute_notebook(nb_path)
+    # 5. build + execute the results notebook (only when the pipeline ran — the notebook
+    # reads the sum files the pipeline produces; skipping the pipeline + executing the
+    # notebook is guaranteed to FileNotFoundError on Yeongyang.sum / etc.)
+    if not skip_pipeline:
+        print("\n[pocketquake] generating + executing the results notebook")
+        nb_path = build_results_nb.build(cluster)
+        _execute_notebook(nb_path)
+    else:
+        print("\n[pocketquake] --skip-pipeline set; skipping the results notebook too "
+              "(it requires sum files the pipeline produces)")
+        nb_path = None
 
     return dict(src_root=info["src_root"], cluster_module=info["module"],
                 waveforms_dir=waveforms_dir, notebook=nb_path)
@@ -191,9 +278,15 @@ def main(argv: list[str] | None = None) -> None:
                     help="Skip waveform download (waveforms already exist in the cluster dir)")
     ap.add_argument("--skip-pipeline", action="store_true",
                     help="Skip the eq-cycle pipeline run (debugging the scaffolding / notebook only)")
-    ap.add_argument("--wf-backend", default="necis", choices=("necis", "stp"),
+    ap.add_argument("--wf-backend", default="necis", choices=("necis", "stp", "mixed"),
                     help="Waveform source: necis (KMA NECIS, default, post-2020 events) | "
-                         "stp (SNU SAC Transfer Protocol, older events)")
+                         "stp (SNU SAC Transfer Protocol, older events) | "
+                         "mixed (per-event dispatch; default try-STP-first with NECIS fallback, "
+                         "or strict date split via --stp-cutoff)")
+    ap.add_argument("--stp-cutoff", default=None,
+                    help="Only meaningful with --wf-backend=mixed. ISO date (e.g. 2024-10-01); "
+                         "events with UTC origin ≥ this date skip STP and go straight to NECIS. "
+                         "Omit to use try-STP-first with NECIS fallback for every event.")
     ap.add_argument("--cores", type=int, default=None,
                     help="Worker cap for the eq-cycle xcorr stage. Forwarded as `--cores N` to "
                          "`pipeline.cli.run_pipeline`, which uses a ProcessPoolExecutor capped at "
@@ -213,6 +306,7 @@ def main(argv: list[str] | None = None) -> None:
         picker=args.picker,
         dtct_isolv=args.dtct_isolv,
         wf_backend=args.wf_backend,
+        stp_cutoff=args.stp_cutoff,
         run_focal_mechanism=not args.no_focal_mechanism,
         skip_download=args.skip_download,
         skip_pipeline=args.skip_pipeline,

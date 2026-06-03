@@ -44,8 +44,13 @@ OPTIONS
   --epi LAT,LON                   override the auto-derived epicenter (catalog centroid)
   --bounds LAT0,LAT1,LON0,LON1    override the auto-derived bounds (catalog bbox + 0.2°)
   --picker {phasenet_plus|stead}  picker model (default: phasenet_plus)
-  --source {necis|stp}            waveform source (default: necis; use stp for pre-2020 events
-                                  that NECIS no longer serves as event segments)
+  --source {necis|stp|mixed}      waveform source (default: necis). `mixed` dispatches
+                                  per-event between STP and NECIS so a single cluster can span
+                                  the STP/NECIS transition; default mode is try-STP-first with
+                                  NECIS fallback for every event.
+  --stp-cutoff YYYY-MM-DD         only with --source mixed: events with UTC origin >= this date
+                                  skip STP and go straight to NECIS (saves a failed STP round-trip
+                                  per known-late event). Omit to use the try-then-fallback default.
   --mainshock UTC_YYYYMMDDHHMMSS  also run Gwangyang-style mainshock treatment after the
                                   default pipeline (re-runs xcorr→dtcc, builds a _main notebook)
   --mainshock-only                skip the default pipeline pass (it must already be complete)
@@ -53,6 +58,11 @@ OPTIONS
                                   useful for re-running treatment on an existing cluster
                                   without redoing scaffold / download / picking / location.
                                   Requires --mainshock.
+  --skip-download                 skip the waveform-download stage (waveforms already on disk).
+                                  Useful for resuming a run after the downloads finished but
+                                  before the pipeline started.
+  --skip-pipeline                 skip the eq-cycle relocation chain AND the results notebook
+                                  (download + scaffold only — for testing the fetch paths).
   --cores N                       cap xcorr workers (forwarded to the eq-cycle CLI's --cores;
                                   default: each cluster's cfg.num_cores, typically 10). Set lower
                                   on memory-constrained boxes (~24 GB/worker observed).
@@ -83,22 +93,27 @@ hdr(){ echo; echo "▸ $*"; }
 # ---- arguments ----
 [[ $# -lt 2 ]] && usage 1
 CATALOG="$1"; SLUG="$2"; shift 2
-EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""
+EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""
+SKIP_DOWNLOAD=0; SKIP_PIPELINE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
         --bounds)          BBOX="$2"; shift 2 ;;
         --picker)          PICKER="$2"; shift 2 ;;
         --source)          SOURCE="$2"; shift 2 ;;
+        --stp-cutoff)      STP_CUTOFF="$2"; shift 2 ;;
         --mainshock)       MAINSHOCK="$2"; shift 2 ;;
         --mainshock-only)  MAIN_ONLY=1; shift ;;
+        --skip-download)   SKIP_DOWNLOAD=1; shift ;;
+        --skip-pipeline)   SKIP_PIPELINE=1; shift ;;
         --cores)           CORES="$2"; shift 2 ;;
         --fg|--foreground) FG=1; shift ;;
         -h|--help)         usage 0 ;;
         *) fail "unknown option: $1" ;;
     esac
 done
-[[ "$SOURCE" == "necis" || "$SOURCE" == "stp" ]] || fail "--source must be 'necis' or 'stp' (got: $SOURCE)"
+[[ "$SOURCE" == "necis" || "$SOURCE" == "stp" || "$SOURCE" == "mixed" ]] || fail "--source must be 'necis' | 'stp' | 'mixed' (got: $SOURCE)"
+[[ -n "$STP_CUTOFF" && "$SOURCE" != "mixed" ]] && fail "--stp-cutoff is only meaningful with --source mixed (got --source $SOURCE)"
 [[ "$MAIN_ONLY" == "1" && -z "$MAINSHOCK" ]] && fail "--mainshock-only requires --mainshock UTC_YYYYMMDDHHMMSS"
 
 # ---- preflight ----
@@ -115,15 +130,23 @@ for c in "${EXISTING[@]}"; do
 done
 ok "slug: $SLUG"
 
-[[ -f "$HERE/.env" ]] || fail "missing $HERE/.env (set NECIS_USER/NECIS_PASS for --source necis, STP_USER/STP_PASS for --source stp)"
+[[ -f "$HERE/.env" ]] || fail "missing $HERE/.env (set NECIS_USER/NECIS_PASS for --source necis, STP_USER/STP_PASS for --source stp; mixed needs BOTH)"
 set -a; . "$HERE/.env"; set +a
-if [[ "$SOURCE" == "stp" ]]; then
-    [[ -n "${STP_USER:-}" && -n "${STP_PASS:-}" ]] || fail ".env loaded but STP_USER/STP_PASS missing (needed for --source stp)"
-    ok "STP credentials loaded ($STP_USER)"
-else
-    [[ -n "${NECIS_USER:-}" ]] || fail ".env loaded but NECIS_USER is empty"
-    ok "NECIS credentials loaded ($NECIS_USER)"
-fi
+case "$SOURCE" in
+    stp)
+        [[ -n "${STP_USER:-}" && -n "${STP_PASS:-}" ]] || fail ".env loaded but STP_USER/STP_PASS missing (needed for --source stp)"
+        ok "STP credentials loaded ($STP_USER)"
+        ;;
+    mixed)
+        [[ -n "${STP_USER:-}" && -n "${STP_PASS:-}" ]] || fail ".env loaded but STP_USER/STP_PASS missing (mixed needs both backends)"
+        [[ -n "${NECIS_USER:-}" ]] || fail ".env loaded but NECIS_USER is empty (mixed needs both backends)"
+        ok "STP+NECIS credentials loaded (STP=$STP_USER, NECIS=$NECIS_USER)"
+        ;;
+    *)
+        [[ -n "${NECIS_USER:-}" ]] || fail ".env loaded but NECIS_USER is empty"
+        ok "NECIS credentials loaded ($NECIS_USER)"
+        ;;
+esac
 
 [[ -x "$PY" ]] || fail "python env not found: $PY"
 ok "python: $PY"
@@ -150,8 +173,9 @@ ok "epicenter:   $EPI"
 ok "region-bbox: $BBOX"
 ok "picker:      $PICKER"
 ok "source:      $SOURCE"
-[[ -n "$CORES"     ]] && ok "cores:       $CORES (xcorr worker cap)"
-[[ -n "$MAINSHOCK" ]] && ok "mainshock:   $MAINSHOCK (treatment will be applied after default run)"
+[[ -n "$STP_CUTOFF" ]] && ok "stp-cutoff:  $STP_CUTOFF (events >= this date skip STP)"
+[[ -n "$CORES"      ]] && ok "cores:       $CORES (xcorr worker cap)"
+[[ -n "$MAINSHOCK"  ]] && ok "mainshock:   $MAINSHOCK (treatment will be applied after default run)"
 
 # ---- the orchestrator command ----
 CMD=(
@@ -162,7 +186,10 @@ CMD=(
     --picker "$PICKER"
     --wf-backend "$SOURCE"
 )
-[[ -n "$CORES" ]] && CMD+=(--cores "$CORES")
+[[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
+[[ -n "$CORES"          ]] && CMD+=(--cores "$CORES")
+[[ "$SKIP_DOWNLOAD" == "1" ]] && CMD+=(--skip-download)
+[[ "$SKIP_PIPELINE" == "1" ]] && CMD+=(--skip-pipeline)
 LOG="$HERE/${SLUG}_run.log"
 
 cd "$HERE"
