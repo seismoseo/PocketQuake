@@ -75,29 +75,35 @@ Both upstream projects are included as **git submodules** under `external/`, so
 
 ## Quickstart
 
+Full install walkthrough (Python env, external binaries, credentials):
+[**docs/INSTALL.md**](docs/INSTALL.md). The condensed version:
+
 ```bash
 git clone --recurse-submodules git@github.com:seismoseo/PocketQuake.git
 cd PocketQuake
-pip install -e .
-pip install -e external/necis-downloader
+pip install -e . -e external/necis-downloader -r requirements.txt
 playwright install chromium       # one-time, for NECIS scraping
 
 cp .env.example .env              # then edit NECIS_USER / NECIS_PASS
 
 # One-command wrapper (auto-derives epicenter + bounds from the catalog;
 # runs in nohup background by default; pass --fg for foreground; --help for options):
-./pocketquake.sh examples/changnyeong/changnyeong_catalog.csv mytest
+./pocketquake.sh examples/chungju/catalog.csv mytest
 
 # Full CLI form (when you want explicit control):
-pocketquake examples/changnyeong/changnyeong_catalog.csv \
-    --cluster changnyeong \
-    --epicenter 35.463,128.427 \
-    --region-bounds 35.3,35.65,128.25,128.65
+pocketquake examples/chungju/catalog.csv \
+    --cluster chungju \
+    --epicenter 36.96,127.78 \
+    --region-bounds 36.85,37.10,127.65,127.95
 ```
 
 `pocketquake.sh` is the friendly one-liner; it auto-derives the epicenter (catalog centroid)
 and region bounds (catalog bbox + 0.2°), checks credentials, and chains the optional
 Gwangyang-style mainshock treatment when you pass `--mainshock UTC_YYYYMMDDHHMMSS`.
+
+External binaries (`hyp1.40`, `hypoDD`, `mseed2sac`, etc.) are not pip-installable — see
+[docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md) for where to get each one. Errors during a
+fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Gallery — what the notebook actually shows
 

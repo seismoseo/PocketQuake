@@ -26,6 +26,7 @@ Mirrors `pocketquake.necis_bridge` in shape so the orchestrator can dispatch on
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from typing import Iterable, Optional
 
@@ -34,18 +35,22 @@ from obspy import UTCDateTime
 from obspy.geodetics.base import gps2dist_azimuth
 
 
-# STP is normally invoked as a shell alias; resolve to the underlying perl script so
-# subprocess sees the same command-line every time (aliases don't survive non-interactive bash).
-STP_PERL_SCRIPT = "/home/msseo/Downloads/stp-client/stp-client.pl"
-
-
 def _stp_cmd() -> list[str]:
-    """The command vector for invoking STP. Override with $STP_CMD if you have a different
-    install location."""
+    """The command vector for invoking STP.
+    Resolution order: $STP_CMD (whole command line) > $STP_PERL_SCRIPT (perl script
+    path) > `stp-client.pl` discovered on PATH. Raises RuntimeError with an actionable
+    message if none of the above resolves. STP is normally invoked as a shell alias;
+    aliases don't survive non-interactive bash, so subprocess needs the explicit path."""
     cmd = os.environ.get("STP_CMD")
     if cmd:
         return cmd.split()
-    return ["/usr/bin/perl", STP_PERL_SCRIPT]
+    script = os.environ.get("STP_PERL_SCRIPT") or shutil.which("stp-client.pl")
+    if not script:
+        raise RuntimeError(
+            "STP client not found. Set STP_PERL_SCRIPT=/path/to/stp-client.pl in .env "
+            "(or $STP_CMD for a custom command line). See docs/EXTERNAL_TOOLS.md for "
+            "where to obtain the STP client.")
+    return ["/usr/bin/perl", script]
 
 
 def _creds(user: Optional[str], pw: Optional[str]) -> tuple[str, str]:

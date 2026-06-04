@@ -30,7 +30,9 @@
 
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PY=/home/msseo/miniforge3/envs/pipeline/bin/python
+# Python interpreter: respect POCKETQUAKE_PYTHON if set; otherwise fall back to whichever
+# python is on PATH. Override via env var when you want a specific conda/venv interpreter.
+PY="${POCKETQUAKE_PYTHON:-$(command -v python3 || command -v python || true)}"
 EQDIR="$HERE/external/korea-cluster-relocation"
 EXISTING=(gwangyang kimcheon jangsung gyeongju changnyeong)
 
@@ -148,7 +150,7 @@ case "$SOURCE" in
         ;;
 esac
 
-[[ -x "$PY" ]] || fail "python env not found: $PY"
+[[ -x "$PY" ]] || fail "python interpreter not found (PY='$PY'). Set POCKETQUAKE_PYTHON=/path/to/python or put 'python3' on PATH."
 ok "python: $PY"
 
 # ---- auto-derive epi / bbox from the catalog ----

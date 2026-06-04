@@ -1,0 +1,32 @@
+# PocketQuake unified Python dependencies.
+# Pinned to versions the author has working; loosen if you need a different toolchain.
+# Notes:
+# - PocketQuake itself (pyproject.toml) declares the minimum (pandas, nbformat,
+#   jupyter, ipykernel). This file adds the deps the submodules need.
+# - PyTorch is an EQNet/seisbench dep. Pin it ONLY if you need CUDA-specific wheels.
+# - kaleido is optional (plotly static-image export); the pipeline degrades gracefully without it.
+
+# core scientific stack
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+
+# seismology
+obspy>=1.4
+seisbench>=0.10
+
+# NECIS downloader (Playwright + requests)
+playwright>=1.40
+requests>=2.30
+
+# notebook tooling
+nbformat>=5.7
+ipykernel>=6.0
+jupyter>=1.0
+plotly>=5.0
+# kaleido            # uncomment if you want plotly static-image export
+
+# PyTorch is required by EQNet/seisbench. CPU wheel works for the pipeline; install
+# matching CUDA wheels yourself if you need GPU.
+torch>=2.0
