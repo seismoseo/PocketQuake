@@ -20,7 +20,10 @@ dependencies:
   - numpy>=1.24
   - scipy>=1.10
   - pandas>=2.0
-  - matplotlib>=3.7
+  # matplotlib-base is the headless-friendly variant: same matplotlib (Agg/inline
+  # backends work in Jupyter / nbconvert), but without the Qt GUI dependency that
+  # pulls in qt6-main + 60 MB of X libraries no server needs.
+  - matplotlib-base>=3.7
   # seismology
   - obspy>=1.4
   # NECIS downloader (Playwright drives the JS portal)
