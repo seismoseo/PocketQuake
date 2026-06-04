@@ -55,14 +55,30 @@ Build from source (Fortran). See [EXTERNAL_TOOLS.md](EXTERNAL_TOOLS.md).
 
 ## `EQNet (PhaseNet+) requires EQNET_DIR`
 
-You're running `--picker phasenet_plus` but the EQNet clone isn't visible. Clone
-<https://github.com/AI4EPS/EQNet> and add `EQNET_DIR=/path/to/EQNet` to `.env`,
-or switch back to the default picker (`--picker stead`, SeisBench PhaseNet).
+PhaseNet+ is the **default** picker. Two fixes:
+
+- **Install EQNet** (recommended — required for the default focal-mechanism stage):
+  ```bash
+  git clone https://github.com/AI4EPS/EQNet.git ~/works/EQNet
+  echo "EQNET_DIR=$HOME/works/EQNet" >> .env
+  ```
+  Weights ship inside the clone at `docs/model_phasenet_plus/model_99.pth`.
+- **Or fall back to SeisBench**: pass `--picker stead` on every run (no extra
+  install; loses polarity / amplitude so SKHASH won't work).
 
 ## `Focal-mechanism stage requires SKHASH_DIR`
 
-Clone <https://code.usgs.gov/esc/SKHASH> and set
-`SKHASH_DIR=/path/to/SKHASH/SKHASH` in `.env`, or omit the focal-mechanism stage.
+The default pipeline runs SKHASH at the end. Two fixes:
+
+- **Install SKHASH**:
+  ```bash
+  git clone https://code.usgs.gov/esc/SKHASH.git ~/works/SKHASH
+  echo "SKHASH_DIR=$HOME/works/SKHASH/SKHASH" >> .env
+  ```
+- **Or skip the stage**: end the pipeline at `dtcc` instead of
+  `focal_mechanism`. Pass through the lower-level CLI (`pipeline.cli.run_pipeline`)
+  with `--through dtcc`. PocketQuake wrapper exposes this via
+  `--skip-pipeline-stage focal_mechanism` (in development).
 
 ## `No module named 'pipeline'`
 

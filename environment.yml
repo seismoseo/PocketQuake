@@ -1,0 +1,47 @@
+# PocketQuake conda environment — one command to install all Python deps + libarchive.
+#
+# Usage:
+#   conda env create -f environment.yml
+#   conda activate pocketquake
+#   pip install -e . -e external/necis-downloader
+#   playwright install chromium
+#
+# This file pins the conda packages PocketQuake itself uses. The deeper deps that
+# come transitively from pip-installed sub-packages (eqnet, skhash) are listed in
+# requirements.txt; we use both. External compiled binaries (hyp1.40, hypoDD,
+# ph2dt, mseed2sac) and the STP Perl client are NOT installable via conda —
+# see docs/EXTERNAL_TOOLS.md.
+name: pocketquake
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # core scientific stack
+  - numpy>=1.24
+  - scipy>=1.10
+  - pandas>=2.0
+  - matplotlib>=3.7
+  # seismology
+  - obspy>=1.4
+  # NECIS downloader (Playwright drives the JS portal)
+  - playwright>=1.40
+  - requests>=2.30
+  # libarchive provides `bsdtar` for NECIS multi-part ZIP extraction
+  - libarchive>=3.7
+  # Jupyter (results notebooks)
+  - jupyter
+  - jupyterlab
+  - nbformat>=5.7
+  - ipykernel>=6.0
+  # Plotly for the results notebook (kaleido optional for static export)
+  - plotly>=5.0
+  - kaleido
+  # PyTorch (CPU build). For CUDA, install the matching wheel from pytorch.org AFTER
+  # `conda activate pocketquake`. The pipeline runs PhaseNet+ on CPU by default —
+  # GPU is not required.
+  - pytorch>=2.0
+  - cpuonly
+  # pip-installed packages (seisbench has no current conda-forge build)
+  - pip
+  - pip:
+      - seisbench>=0.11

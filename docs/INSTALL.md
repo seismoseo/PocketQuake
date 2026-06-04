@@ -1,107 +1,152 @@
 # PocketQuake installation
 
-End-to-end install guide for a fresh clone. After following this, the `examples/chungju`
-smoke test should run.
+End-to-end install guide for a fresh clone. After following this, the
+`examples/chungju` smoke test should run.
 
-## Prerequisites
+The default pipeline is **PhaseNet+ → HypoInverse → HypoDD → SKHASH focal
+mechanism**, so this guide installs everything that chain needs. STP is
+optional (only for pre-2020 waveforms).
+
+## 0. Prerequisites
 
 - Linux or macOS (the wrapper is bash; Windows users need WSL)
-- Python 3.10 or newer (3.11 recommended)
+- conda or mamba (Miniforge / Miniconda / Mambaforge — any works)
 - git with submodule support
-- ~10 GB free disk (Playwright Chromium is large; example downloads add more)
+- A working C and Fortran toolchain (`gcc`, `gfortran`, `make`) for the
+  compiled external binaries listed below
+- ~10 GB free disk (Playwright Chromium + example waveforms)
 
 ## 1. Clone with submodules
 
 ```bash
 git clone --recurse-submodules https://github.com/seismoseo/PocketQuake.git
 cd PocketQuake
-```
-
-If you cloned without `--recurse-submodules`:
-
-```bash
+# If you cloned without --recurse-submodules:
 git submodule update --init --recursive
 ```
 
-## 2. Python environment
-
-A venv or conda env is recommended. Then:
+## 2. Conda environment (one command)
 
 ```bash
-pip install -e .                         # PocketQuake itself
-pip install -e external/necis-downloader  # NECIS waveform downloader
-pip install -r requirements.txt           # shared deps (obspy, seisbench, etc.)
+conda env create -f environment.yml
+conda activate pocketquake
+pip install -e . -e external/necis-downloader
+playwright install chromium      # one-time, ~200 MB
 ```
 
-The eq-cycle pipeline under `external/korea-cluster-relocation/` has no `pyproject.toml`;
-its runtime needs (`obspy`, `seisbench`, `plotly`, `kaleido`) are already covered by
-`requirements.txt`.
+`environment.yml` installs Python, obspy, seisbench, playwright, pytorch (CPU),
+plotly, jupyter, and `libarchive` (which provides `bsdtar`). If you need GPU
+PyTorch for PhaseNet+, install the matching CUDA wheel from <https://pytorch.org>
+*after* activating the env.
 
-## 3. Browser for the NECIS downloader
+## 3. External binaries (compiled)
 
-The NECIS portal is a JavaScript single-page app, so the downloader uses Playwright.
-Install Chromium one-time (~200 MB):
+These are NOT pip-installable. The defaults rely on them being on `$PATH`.
+Detailed build instructions live in [EXTERNAL_TOOLS.md](EXTERNAL_TOOLS.md);
+the short form:
+
+- **`hyp1.40`** — HypoInverse-2000 (USGS Fortran source build)
+- **`ph2dt`** + **`hypoDD`** — Waldhauser's HypoDD distribution (Fortran)
+- **`mseed2sac`** — IRIS C source build
+
+If you already have these, skip ahead. Otherwise, follow
+[EXTERNAL_TOOLS.md §Compiled binaries](EXTERNAL_TOOLS.md#compiled-binaries-fortran--c--make).
+
+## 4. EQNet (PhaseNet+ picker) — required for the default
+
+PhaseNet+ is the default picker because it emits first-motion polarity +
+per-pick amplitudes that SKHASH consumes.
 
 ```bash
-playwright install chromium
+cd ~/works     # or wherever you want EQNet
+git clone https://github.com/AI4EPS/EQNet.git
+cd EQNet
+pip install -r requirements.txt    # PocketQuake's env already has PyTorch
+echo "EQNET_DIR=$PWD" >> ~/works/PocketQuake/.env
 ```
 
-## 4. External binaries
+The PhaseNet+ weights are bundled in the EQNet repo at
+`docs/model_phasenet_plus/model_99.pth` — no separate download needed.
 
-PocketQuake calls **out-of-process** to a handful of seismology tools that are not
-pip-installable. See [EXTERNAL_TOOLS.md](EXTERNAL_TOOLS.md) for sources, install
-recipes, and env-var conventions:
+If you prefer the SeisBench PhaseNet picker (no extra clone), pass
+`--picker stead` on every run. The default `phasenet_plus` is recommended
+because the focal-mechanism stage needs polarity / amplitude data only
+PhaseNet+ produces.
 
-- `hyp1.40` (HypoInverse)
-- `ph2dt`, `hypoDD`
-- `mseed2sac`, `bsdtar` (for unpacking NECIS archives)
-- `EQNet` (only if you use `--picker phasenet_plus`)
-- `SKHASH` (only if you run focal mechanisms)
-
-Place the binaries on your `PATH`. PocketQuake checks at first use and prints
-actionable errors if anything is missing.
-
-## 5. Credentials
-
-KMA-side waveforms are not freely browsable; you need accounts.
-
-### NECIS (KMA)
-
-1. Apply at <https://necis.kma.go.kr> — research or institutional accounts only.
-   Approval takes 1–5 days.
-2. Once approved, copy `.env.example` to `.env` and fill in:
-   ```bash
-   NECIS_USER=your-id
-   NECIS_PASS=your-password
-   ```
-
-### STP (SNU, optional)
-
-Only needed if you want pre-2020 waveforms via `--source stp` or `--source mixed`.
-Contact the SGTL lab at SNU for credentials. Then in `.env`:
+## 5. SKHASH (focal mechanism) — required for the default
 
 ```bash
-STP_USER=your-stp-id
-STP_PASS=your-stp-password
+cd ~/works
+git clone https://code.usgs.gov/esc/SKHASH.git
+echo "SKHASH_DIR=$PWD/SKHASH/SKHASH" >> ~/works/PocketQuake/.env
 ```
 
-## 6. Smoke test — chungju example
+SKHASH's Python deps (numpy, scipy, pandas) are already in the `pocketquake`
+conda env.
+
+## 6. Credentials
 
 ```bash
-./pocketquake.sh examples/chungju/catalog.csv chungju_smoke --skip-pipeline
+cp .env.example .env
+# then edit:
+#   NECIS_USER, NECIS_PASS — required (see below)
+#   STP_USER, STP_PASS     — only if you use --source stp / mixed
 ```
 
-Expected: NECIS download starts; cluster scaffold lands at
-`external/korea-cluster-relocation/chungju_smoke_cluster/`. No "command not
-found" errors. Run without `--skip-pipeline` for the full HypoInverse → HypoDD →
-focal-mechanism → results-notebook pipeline (under ~30 min for the chungju
-catalog).
+### NECIS
 
-## Troubleshooting
+1. Apply at <https://necis.kma.go.kr>. Research / institutional accounts
+   only; approval takes 1–5 days.
+2. Fill `NECIS_USER` / `NECIS_PASS` in `.env`.
 
-If anything breaks, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — it covers the
-common fresh-clone errors (Python not found, missing STP client, missing
-binaries, Playwright Chromium, NECIS credentials).
+### STP (optional — only for `--source stp` or `--source mixed`)
+
+Contact the SGTL lab at SNU for credentials. STP fetches pre-2020 waveforms
+that NECIS no longer serves as packaged event archives.
+
+## 7. Smoke test — chungju example
+
+```bash
+./pocketquake.sh examples/chungju/catalog.csv chungju_smoke
+```
+
+Expected end-state (default pipeline, ~30 min for the 4-event chungju
+catalog):
+
+- `external/korea-cluster-relocation/chungju_smoke_cluster/kma_waveforms/` —
+  NECIS-downloaded SACs per event
+- `external/korea-cluster-relocation/pipeline/runs/chungju_smoke/1.HypoInv/kim1983/Chungju_smoke.sum`
+  — HypoInverse absolute locations
+- `external/korea-cluster-relocation/pipeline/runs/chungju_smoke/2.HypoDD/.../hypoDD.reloc`
+  — relative-relocated catalog
+- `external/korea-cluster-relocation/pipeline/runs/chungju_smoke/3.focal_mechanism/`
+  — SKHASH solutions
+- `external/korea-cluster-relocation/pipeline/notebooks/03_results_chungju_smoke.ipynb`
+  — executed results notebook with maps, sections, and focal mechanisms
+
+If you want to skip the relocation pipeline and only verify the download
+path, append `--skip-pipeline`.
+
+## 8. Troubleshooting
+
+If anything breaks, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — it maps
+the common fresh-clone errors (missing python, missing externals, NECIS
+credentials, Playwright Chromium) to one-line fixes.
+
+## Minimum-viable install (no focal mechanism, no PhaseNet+)
+
+If you don't want to install EQNet + SKHASH and are OK with absolute +
+relative location only:
+
+```bash
+# In .env, leave EQNET_DIR and SKHASH_DIR unset.
+# Then for every run, force the SeisBench PhaseNet picker:
+./pocketquake.sh examples/chungju/catalog.csv chungju_smoke \
+    --picker stead --skip-pipeline-stage focal_mechanism
+```
+
+(The `--skip-pipeline-stage` flag is wired through to
+`pipeline.cli.run_pipeline --through dtcc`.)
 
 ## What we don't ship yet
 

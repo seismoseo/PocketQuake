@@ -75,19 +75,31 @@ Both upstream projects are included as **git submodules** under `external/`, so
 
 ## Quickstart
 
-Full install walkthrough (Python env, external binaries, credentials):
+Full install walkthrough (conda env, external binaries, credentials):
 [**docs/INSTALL.md**](docs/INSTALL.md). The condensed version:
 
 ```bash
 git clone --recurse-submodules git@github.com:seismoseo/PocketQuake.git
 cd PocketQuake
-pip install -e . -e external/necis-downloader -r requirements.txt
-playwright install chromium       # one-time, for NECIS scraping
 
+# 1. Python environment (one command; includes obspy, seisbench, playwright,
+#    PyTorch CPU, libarchive's bsdtar, jupyter, plotly).
+conda env create -f environment.yml
+conda activate pocketquake
+pip install -e . -e external/necis-downloader
+playwright install chromium       # one-time, ~200 MB
+
+# 2. External binaries (NOT pip-installable). See docs/EXTERNAL_TOOLS.md.
+#    hyp1.40, ph2dt, hypoDD, mseed2sac on $PATH.
+
+# 3. EQNet (PhaseNet+ — default picker) + SKHASH (focal mechanism) — required
+#    for the default pipeline. See docs/INSTALL.md §4-§5. Two git clones + two
+#    env vars in .env: EQNET_DIR, SKHASH_DIR.
+
+# 4. NECIS account.
 cp .env.example .env              # then edit NECIS_USER / NECIS_PASS
 
-# One-command wrapper (auto-derives epicenter + bounds from the catalog;
-# runs in nohup background by default; pass --fg for foreground; --help for options):
+# 5. Run the chungju example end-to-end.
 ./pocketquake.sh examples/chungju/catalog.csv mytest
 
 # Full CLI form (when you want explicit control):
@@ -101,9 +113,12 @@ pocketquake examples/chungju/catalog.csv \
 and region bounds (catalog bbox + 0.2°), checks credentials, and chains the optional
 Gwangyang-style mainshock treatment when you pass `--mainshock UTC_YYYYMMDDHHMMSS`.
 
+**Default pipeline**: PhaseNet+ → HypoInverse → HypoDD → SKHASH focal mechanism.
+For a minimum-viable run without EQNet / SKHASH, see [docs/INSTALL.md §Minimum-viable](docs/INSTALL.md#minimum-viable-install-no-focal-mechanism-no-phasenet).
+
 External binaries (`hyp1.40`, `hypoDD`, `mseed2sac`, etc.) are not pip-installable — see
-[docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md) for where to get each one. Errors during a
-fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+[docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md) for build instructions per tool.
+Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Gallery — what the notebook actually shows
 
