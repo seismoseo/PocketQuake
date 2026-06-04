@@ -9,12 +9,22 @@ optional (only for pre-2020 waveforms).
 
 ## 0. Prerequisites
 
-- Linux or macOS (the wrapper is bash; Windows users need WSL)
-- conda or mamba (Miniforge / Miniconda / Mambaforge — any works)
-- git with submodule support
-- A working C and Fortran toolchain (`gcc`, `gfortran`, `make`) for the
-  compiled external binaries listed below
-- ~10 GB free disk (Playwright Chromium + example waveforms)
+- **OS**: Linux or macOS (wrapper is bash; Windows users need WSL)
+- **glibc ≥ 2.28** — Ubuntu 20.04+, RHEL/Rocky 8+, Debian 10+, or any newer
+  distro. Playwright's bundled Node binary requires `GLIBC_2.27/2.28`,
+  `CXXABI_1.3.11`, `GLIBCXX_3.4.21`; older systems like CentOS 7 / RHEL 7
+  (glibc 2.17, gcc 4.8) **cannot run the NECIS downloader**. On such boxes,
+  do the NECIS download on a newer machine, rsync the cluster dir, then
+  run the relocation stages locally (no Playwright needed).
+- **Python**: 3.10+ (pinned by `environment.yml`)
+- **conda or mamba** (Miniforge / Miniconda / Mambaforge — any works)
+- **git** with submodule support
+- **C and Fortran toolchain** (`gcc`, `gfortran`, `make`) for the compiled
+  external binaries (`hyp1.40`, `ph2dt`, `hypoDD`, `mseed2sac`). gcc ≥ 9.3
+  recommended.
+- **Network**: HTTPS access to github.com, code.usgs.gov, and conda-forge
+- **Disk**: ~10 GB free (~2 GB conda env + ~500 MB Playwright Chromium +
+  waveform downloads that scale with catalog size)
 
 ## 1. Clone with submodules
 
