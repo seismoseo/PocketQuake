@@ -79,7 +79,7 @@ Full install walkthrough (conda env, external binaries, credentials):
 [**docs/INSTALL.md**](docs/INSTALL.md). The condensed version:
 
 ```bash
-git clone --recurse-submodules git@github.com:seismoseo/PocketQuake.git
+git clone --recurse-submodules https://github.com/seismoseo/PocketQuake.git
 cd PocketQuake
 
 # 1. Python environment (one command; includes obspy, seisbench, playwright,
