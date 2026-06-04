@@ -33,15 +33,15 @@ dependencies:
   - jupyterlab
   - nbformat>=5.7
   - ipykernel>=6.0
-  # Plotly for the results notebook (kaleido optional for static export)
+  # Plotly for the results notebook
   - plotly>=5.0
-  - kaleido
-  # PyTorch (CPU build). For CUDA, install the matching wheel from pytorch.org AFTER
-  # `conda activate pocketquake`. The pipeline runs PhaseNet+ on CPU by default —
-  # GPU is not required.
+  # PyTorch — conda-forge's pytorch wheels are CPU by default; the pipeline runs
+  # PhaseNet+ on CPU just fine. For CUDA, install the matching wheel from
+  # https://pytorch.org/ AFTER `conda activate pocketquake`.
   - pytorch>=2.0
-  - cpuonly
-  # pip-installed packages (seisbench has no current conda-forge build)
+  # pip-installed packages (no current conda-forge build).
+  # kaleido is optional (plotly static image export); pip-install it manually if
+  # the results notebook needs PNG exports.
   - pip
   - pip:
       - seisbench>=0.11
