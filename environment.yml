@@ -26,6 +26,11 @@ dependencies:
   - matplotlib-base>=3.7
   # seismology
   - obspy>=1.4
+  # h5py + tqdm are seisbench deps; install via conda-forge to avoid pip
+  # trying to BUILD h5py from source on older systems (would also try to
+  # rebuild numpy, which needs GCC >= 9.3 — fails on RHEL 7 / CentOS 7).
+  - h5py>=3
+  - tqdm
   # NECIS downloader (Playwright drives the JS portal)
   - playwright>=1.40
   - requests>=2.30
