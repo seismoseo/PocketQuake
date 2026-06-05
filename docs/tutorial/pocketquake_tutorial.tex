@@ -32,7 +32,7 @@
 
 \title{PocketQuake}
 \subtitle{From a catalog CSV to a relocation notebook in one command}
-\author{seismoseo / SGTL, SNU}
+\author{Min-Seong Seo / SGTL, SNU}
 \date{}
 
 \begin{document}
@@ -53,7 +53,7 @@ relocation + focal-mechanism notebook. It glues two specialised submodules:
 \bigskip
 \textbf{One command, end to end:}
 \begin{lstlisting}
-./pocketquake.sh examples/chungju/chungju_catalog.csv chungju_smoke
+./pocketquake.sh ./examples/chungju/chungju_catalog.csv chungju
 \end{lstlisting}
 \bigskip
 Output: an executed Jupyter notebook with maps, depth sections, and beachball
@@ -170,13 +170,13 @@ Year,Month,Day,Hour,Minute,Second,Latitude,Longitude,Magnitude,Depth
 % ----------------------------------------------------------------- run
 \begin{frame}[fragile]{Run the chungju example}
 \begin{lstlisting}[language=bash]
-./pocketquake.sh examples/chungju/chungju_catalog.csv chungju_smoke
+./pocketquake.sh ./examples/chungju/chungju_catalog.csv chungju
 \end{lstlisting}
 \smallskip
 The wrapper:
 \begin{enumerate}
   \item scaffolds a cluster dir under
-        \texttt{external/korea-cluster-relocation/chungju\_smoke\_cluster/}
+        \texttt{external/korea-cluster-relocation/chungju\_cluster/}
   \item downloads NECIS waveforms (Playwright drives the JS portal,
         polls the staging queue, streams the FTP files)
   \item runs PhaseNet+ $\to$ HypoInverse $\to$ HypoDD $\to$ SKHASH
@@ -198,7 +198,7 @@ Useful flags:
 \textbf{Default} (background): \texttt{nohup.out} in the working directory.
 \bigskip
 \begin{lstlisting}[language=bash]
-[pocketquake] scaffolding chungju_smoke_cluster ...
+[pocketquake] scaffolding chungju_cluster ...
 [necis] login OK; submitting request for 4 event(s)
 [necis] request id 4f3a... status=P -> C, downloading 4 SAC bundles
 [eqcycle] picking with phasenet_plus (~30s/event)
@@ -206,7 +206,7 @@ Useful flags:
 [eqcycle] xcorr 6 pairs (10 workers) ...
 [eqcycle] dt.cc -> hypoDD reloc OK (4 events)
 [eqcycle] focal_mechanism: 4 SKHASH solutions
-[pocketquake] executing 03_results_chungju_smoke.ipynb
+[pocketquake] executing 03_results_chungju.ipynb
 \end{lstlisting}
 \smallskip
 Wall-clock for chungju: $\sim$15 min on a 16-core box.
@@ -227,7 +227,7 @@ All four solutions converge on a near-vertical N--S right-lateral strike-slip pl
 % ----------------------------------------------------------------- output 2
 \begin{frame}{Output 2 --- Depth sections}
 \begin{center}
-\includegraphics[width=0.85\textwidth,height=0.72\textheight,keepaspectratio]{figures/03_depth_sections.png}
+\includegraphics[width=0.8\textwidth]{figures/03_depth_sections.png}
 \end{center}
 \vspace{-0.5em}
 \scriptsize
@@ -240,9 +240,9 @@ $\sim$1\,km scatter (KMA bulletin) to $\sim$200\,m.
 \begin{frame}{Output 3 --- Beachball gallery + record section}
 \begin{columns}[T,onlytextwidth]
 \column{0.48\textwidth}
-\includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figures/04_beachball_gallery.png}
+\includegraphics[width=\textwidth]{figures/04_beachball_gallery.png}
 \column{0.48\textwidth}
-\includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figures/06_record_section_M31.png}
+\includegraphics[width=\textwidth]{figures/06_record_section_M31.png}
 \end{columns}
 \vspace{0.5em}
 \scriptsize
@@ -313,7 +313,7 @@ and the SKHASH-inferred S/P amplitude ratios (right).
 \centering
 \textbf{\url{https://github.com/seismoseo/PocketQuake}} \\
 \smallskip
-\textit{Made by seismoseo / SGTL, SNU.}
+\textit{Made by Min-Seong Seo / SGTL, SNU.}
 \end{frame}
 
 \end{document}
