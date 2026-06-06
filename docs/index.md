@@ -2,6 +2,9 @@
 
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
+!!! info inline end "Version"
+    **v1.8.2** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
+
 PocketQuake glues two projects into a single reproducible workflow for Korean earthquake sequences:
 
 - **[necis-downloader](https://github.com/seismoseo/necis-downloader)** — fetches KMA NECIS waveforms for an event list (with STP fallback for pre-2020 events).
