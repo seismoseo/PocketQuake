@@ -48,6 +48,19 @@ pip install --upgrade --index-url https://download.pytorch.org/whl/cu128 torch
 python -c "import torch; print('sm_120' in torch.cuda.get_arch_list(), torch.cuda.get_device_name(0))"
 ```
 
+Then activate that env and run the `--python` pipeline as usual — **nothing else to set**, GPU is used automatically:
+
+```bash
+conda activate <your-env>          # the env the CUDA wheel was installed into
+./pocketquake.sh catalog.csv myslug --python
+```
+
+Confirm it engaged: the run log prints `[hyposvi] device: cuda:0` (a CPU fallback prints `device: cpu` with a one-line reason). If you keep **separate CPU and GPU envs**, point the wrapper at the GPU one without activating:
+
+```bash
+POCKETQUAKE_PYTHON=/path/to/gpu-env/bin/python ./pocketquake.sh catalog.csv myslug --python
+```
+
 No GPU? Nothing to do — the pipeline runs on CPU automatically.
 
 ## Train your own velocity model
