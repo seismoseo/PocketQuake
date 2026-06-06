@@ -403,5 +403,10 @@ fi
 
 hdr "done — open the notebook(s):"
 echo "  jupyter lab $EQDIR/pipeline/notebooks/03_results_${SLUG}.ipynb"
-[[ -n "$MAINSHOCK" ]] && \
-echo "  jupyter lab $EQDIR/pipeline/notebooks/03_results_${SLUG}_main.ipynb     (mainshock-treated)"
+if [[ -n "$MAINSHOCK" ]]; then
+    echo "  jupyter lab $EQDIR/pipeline/notebooks/03_results_${SLUG}_main.ipynb     (mainshock-treated)"
+fi
+# End on a clean status: the bare `[[ -n "$MAINSHOCK" ]] && echo` used to leave the
+# script's exit code at 1 on every successful non-mainshock run (last command failed
+# under `set -e`), making the wrapper report failure even though the pipeline completed.
+exit 0

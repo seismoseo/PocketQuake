@@ -34,9 +34,21 @@ python -m pipeline.core.fetch_eikonet
 
 On chungju the **relative** (translation-removed) locations match `hypoDD` to **1 m horizontal / 3 m depth**; on *identical* inputs the relocators agree to ~1.3 m. The absolute centroid can differ (HypoSVI vs HYPOINVERSE) — expected, and not what double-difference constrains.
 
-## GPU
+## GPU (recommended)
 
-HypoSVI location auto-detects a usable CUDA GPU and falls back to CPU otherwise (it smoke-tests a real op, so a GPU newer than the installed PyTorch build — e.g. Blackwell sm_120 on a cu124 wheel — cleanly uses CPU instead of crashing). To enable GPU on newer cards, install a matching CUDA wheel from [pytorch.org](https://pytorch.org/get-started/locally/).
+HypoSVI location runs on the GPU **automatically** — `hyposvi_device` defaults to `auto`, which smoke-tests a real CUDA op and uses the GPU when it works, falling back to CPU otherwise (so a GPU newer than the installed PyTorch — e.g. Blackwell sm_120 on an older wheel — cleanly uses CPU instead of crashing). The GPU path is a pure acceleration: locations match the CPU run to within SVGD's own run-to-run scatter (~6 m in depth on chungju).
+
+It is **much** faster. On an RTX PRO 6000 Blackwell the per-event SVGD locate is **~3.5 s vs ~37 s on CPU (~10–20×)** — so a 15,000-event catalog drops from **~1–2 weeks to ~15 hours**. For anything beyond a small cluster, GPU is the difference between practical and not.
+
+To enable it, install a CUDA PyTorch wheel matching your card from [pytorch.org](https://pytorch.org/get-started/locally/) (e.g. `cu128` for Blackwell sm_120):
+
+```bash
+pip install --upgrade --index-url https://download.pytorch.org/whl/cu128 torch
+# verify your card is supported (must print True + your GPU name):
+python -c "import torch; print('sm_120' in torch.cuda.get_arch_list(), torch.cuda.get_device_name(0))"
+```
+
+No GPU? Nothing to do — the pipeline runs on CPU automatically.
 
 ## Train your own velocity model
 

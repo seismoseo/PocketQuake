@@ -45,9 +45,21 @@ playwright install chromium      # one-time, ~200 MB
 ```
 
 `environment.yml` installs Python, obspy, seisbench, playwright, pytorch (CPU),
-plotly, jupyter, and `libarchive` (which provides `bsdtar`). If you need GPU
-PyTorch for PhaseNet+, install the matching CUDA wheel from <https://pytorch.org>
-*after* activating the env.
+plotly, jupyter, and `libarchive` (which provides `bsdtar`).
+
+**GPU is recommended** if you use the `--python` / HypoSVI backend — the per-event
+locate is ~10–20× faster (a 15k-event catalog is ~15 h on GPU vs ~1–2 weeks on CPU).
+After activating the env, install a CUDA PyTorch wheel matching your card from
+<https://pytorch.org/get-started/locally/> (e.g. `cu128` for Blackwell sm_120):
+
+```bash
+pip install --upgrade --index-url https://download.pytorch.org/whl/cu128 torch
+python -c "import torch; print('sm_120' in torch.cuda.get_arch_list(), torch.cuda.get_device_name(0))"
+```
+
+HypoSVI auto-detects the GPU and falls back to CPU, so this step is optional — the
+default Fortran path and CPU HypoSVI both run fine without it. See
+[Python backend → GPU](python-backend.md#gpu-recommended).
 
 ## 3. External binaries (compiled)
 

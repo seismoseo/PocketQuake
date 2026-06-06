@@ -43,9 +43,12 @@ dependencies:
   - ipykernel>=6.0
   # Plotly for the results notebook
   - plotly>=5.0
-  # PyTorch — conda-forge's pytorch wheels are CPU by default; the pipeline runs
-  # PhaseNet+ on CPU just fine. For CUDA, install the matching wheel from
-  # https://pytorch.org/ AFTER `conda activate pocketquake`.
+  # PyTorch. conda-forge ships a CPU build by default. GPU is RECOMMENDED for the
+  # --python / HypoSVI path: per-event SVGD locate is ~10-20x faster (a 15k-event
+  # catalog is ~15 h on GPU vs ~1-2 weeks on CPU). After `conda activate pocketquake`,
+  # install a CUDA wheel matching your card from https://pytorch.org/get-started/locally/
+  # (e.g. cu128 for Blackwell sm_120). HypoSVI auto-detects the GPU and falls back to
+  # CPU, so this is optional — PhaseNet+ and CPU HypoSVI both run fine without it.
   - pytorch>=2.0
   # HypoSVI + EikoNet backend (the --python / --loc-backend hyposvi path) imports these
   # at module load — undeclared deps of those external clones.
