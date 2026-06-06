@@ -113,26 +113,41 @@ pocketquake examples/chungju/catalog.csv \
 and region bounds (catalog bbox + 0.2°), checks credentials, and chains the optional
 Gwangyang-style mainshock treatment when you pass `--mainshock UTC_YYYYMMDDHHMMSS`.
 
-**Default pipeline**: PhaseNet+ → HypoInverse → HypoDD → SKHASH focal mechanism.
-For a minimum-viable run without EQNet / SKHASH, see [docs/INSTALL.md §Minimum-viable](docs/INSTALL.md#minimum-viable-install-no-focal-mechanism-no-phasenet).
+### Two ways to relocate — pick what fits your setup
 
-**Fortran-free option (v1.8.0)**: run absolute location + relocation entirely in Python
-(HypoSVI + EikoNet, relocDD-py) — no `hyp1.40` / `ph2dt` / `hypoDD` build needed:
+PocketQuake ships **two interchangeable relocation modes**. They take the same picks, write
+the same files, and build the same summary notebook — and they agree on *relative* locations
+to ~1 m. Picking (PhaseNet+) and focal mechanisms (SKHASH) are identical either way.
+
+| | **Fortran mode** *(default)* | **Python mode** (`--python`) |
+|---|---|---|
+| Absolute location | HYPOINVERSE (`hyp1.40`) | HypoSVI + EikoNet |
+| Relocation | `ph2dt` + `hypoDD` | relocDD-py |
+| Setup | 3 compiled Fortran binaries | 3 Python clones — **no compiler** |
+| Good when… | you have the binaries / want the long-trusted reference | no Fortran toolchain (or you want GPU location) |
 
 ```bash
-# one-time: clone the three Python tools (not on PyPI) and point .env at them
+./pocketquake.sh catalog.csv myrun              # Fortran  (default)
+./pocketquake.sh catalog.csv myrun --python     # pure Python
+./pocketquake.sh catalog.csv myrun --compare    # run BOTH → side-by-side comparison notebook
+```
+
+**Fortran mode** needs `hyp1.40`, `ph2dt`, `hypoDD` on `$PATH` — see
+[docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md). For a minimum-viable run without EQNet /
+SKHASH, see [docs/INSTALL.md §Minimum-viable](docs/INSTALL.md#minimum-viable-install-no-focal-mechanism-no-phasenet).
+
+**Python mode** needs three clones (no compiler) — set once in `.env`:
+
+```bash
 git clone https://github.com/katie-biegel/relocDD-py.git && echo "RELOCDD_PY_DIR=$PWD/relocDD-py" >> .env
 git clone https://github.com/Ulvetanna/HypoSVI.git        && echo "HYPOSVI_DIR=$PWD/HypoSVI"       >> .env
 git clone https://github.com/Ulvetanna/EikoNet.git        && echo "EIKONET_DIR=$PWD/EikoNet"       >> .env
-python -m pipeline.core.fetch_eikonet              # one-time: pretrained kim1983 + kim2011 weights
-
-./pocketquake.sh examples/chungju/catalog.csv mytest --python
-./pocketquake.sh examples/chungju/catalog.csv mytest --compare   # ff vs pp side-by-side notebook
+python -m pipeline.core.fetch_eikonet            # pretrained kim1983 + kim2011 weights (one-time)
 ```
 
-It is faithful to the Fortran chain — relative locations match `hypoDD` to ~1 m on identical
-input, with the same SVD→LSQR adaptive-damping solver and the same bootstrap 95% error bars
-(the absolute epicentre can differ, HypoSVI vs HypoInverse — that centroid offset is expected).
+The absolute epicentre can differ between modes (HypoSVI vs HYPOINVERSE) — that centroid
+offset is normal and not what double-difference relocation constrains. Full Python recipe
+(GPU, training your own velocity model): [docs/python_backend/README.md](external/korea-cluster-relocation/docs/python_backend/README.md).
 The default Fortran path is unchanged. Full recipe (incl. training your own velocity model):
 [docs/python_backend/README.md](external/korea-cluster-relocation/docs/python_backend/README.md).
 

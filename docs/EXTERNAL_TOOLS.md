@@ -1,27 +1,29 @@
 # External tools
 
-PocketQuake's default pipeline (`./pocketquake.sh CATALOG SLUG`) runs:
-**PhaseNet+ picker → HypoInverse → HypoDD → SKHASH focal mechanism**.
-That chain depends on a handful of programs that are not pip-installable; you
-must install them on your `PATH` (or point at them with the env var noted below)
-before the default pipeline can run end-to-end.
+PocketQuake relocates two ways (see the README's *Two ways to relocate*):
+
+- **Fortran mode** (default, `./pocketquake.sh CATALOG SLUG`): HypoInverse → HypoDD.
+- **Python mode** (`--python`): HypoSVI + EikoNet → relocDD-py — **no Fortran build**.
+
+The picker (PhaseNet+) and focal mechanisms (SKHASH) are the **same in both modes**. None of
+these tools are pip-installable; the `Needed for` column tells you which mode needs what — you
+only install **one** relocation mode's tools.
 
 ## At-a-glance: what you must install
 
-| Tool | Required for | How to get it | Where it must end up |
+| Tool | Needed for | How to get it | Where it must end up |
 |---|---|---|---|
-| `hyp1.40` (HypoInverse-2000) | **default** — absolute location | USGS source build | on `$PATH` |
-| `ph2dt` + `hypoDD` | **default** — relative location | Waldhauser source build | on `$PATH` |
-| `mseed2sac` | **default** — NECIS → SAC | IRIS source build | on `$PATH` |
-| `bsdtar` | **default** — multi-part ZIP from NECIS | `conda install -c conda-forge libarchive` (provided by `environment.yml`) | on `$PATH` |
-| **EQNet + PhaseNet+ weights** | **default picker** | `git clone` (steps below) | `EQNET_DIR` env var |
-| **SKHASH** | **default focal-mechanism stage** | `git clone` (steps below) | `SKHASH_DIR` env var |
+| **EQNet + PhaseNet+ weights** | **both modes** — picker | `git clone` (steps below) | `EQNET_DIR` env var |
+| **SKHASH** | **both modes** — focal mechanisms | `git clone` (steps below) | `SKHASH_DIR` env var |
+| `mseed2sac` | **both modes** — NECIS → SAC | IRIS source build | on `$PATH` |
+| `bsdtar` | **both modes** — multi-part ZIP from NECIS | `conda install -c conda-forge libarchive` (in `environment.yml`) | on `$PATH` |
+| `hyp1.40` (HypoInverse-2000) | **Fortran mode** — absolute location | USGS source build | on `$PATH` |
+| `ph2dt` + `hypoDD` | **Fortran mode** — relocation | Waldhauser source build | on `$PATH` |
+| **relocDD-py** | **Python mode** (`--python`) — relocation | `git clone` (steps below) | `RELOCDD_PY_DIR` env var |
+| **HypoSVI + EikoNet** | **Python mode** (`--python`) — location | `git clone` ×2 + `fetch_eikonet` weights | `HYPOSVI_DIR`, `EIKONET_DIR` env vars |
 | `stp-client.pl` | only `--source stp` / `mixed` | contact SGTL lab @ SNU | `STP_PERL_SCRIPT` env var or on `$PATH` |
 | Helvetica fonts | only nicer plot text | optional — DejaVu Sans fallback | `HELVETICA_DIR` env var |
-| **relocDD-py** | only `--reloc-backend relocdd_py` (Fortran-free reloc) | `git clone` (steps below) | `RELOCDD_PY_DIR` env var |
-| **HypoSVI + EikoNet** | only `--loc-backend hyposvi` (Fortran-free location) | `git clone` + train EikoNet | `HYPOSVI_EIKONET_P/S` env vars |
 
-The default pipeline assumes you have everything except STP and Helvetica.
 If you want a minimum-viable run without focal mechanisms, see [INSTALL.md](INSTALL.md) §6.
 
 ---
