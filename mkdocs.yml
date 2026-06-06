@@ -1,0 +1,58 @@
+site_name: PocketQuake
+site_description: From an event-catalog CSV to a relocation-summary notebook in one command.
+site_url: https://pocketquake.readthedocs.io/
+repo_url: https://github.com/seismoseo/PocketQuake
+repo_name: seismoseo/PocketQuake
+edit_uri: edit/main/docs/
+copyright: Made by Min-Seong Seo / SGTL, SNU
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle: {icon: material/weather-night, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle: {icon: material/weather-sunny, name: Switch to light mode}
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight: {anchor_linenums: true}
+  - pymdownx.tabbed: {alternate_style: true}
+  - toc: {permalink: true}
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Installation: INSTALL.md
+  - Two relocation modes: relocation-modes.md
+  - CLI reference: cli.md
+  - External tools: EXTERNAL_TOOLS.md
+  - Python backend: python-backend.md
+  - Workflow: workflow.md
+  - Troubleshooting: TROUBLESHOOTING.md
+
+validation:
+  nav: {omitted_files: ignore, not_found: warn}
+  links: {not_found: ignore}
