@@ -384,8 +384,9 @@ _DEFAULT_OUT = os.path.join(_PQ_ROOT, "external", "korea-cluster-relocation",
                             "pipeline", "notebooks")
 
 
-def build(cluster: str, out_dir: str = _DEFAULT_OUT) -> str:
-    """Write 03_results_<cluster>.ipynb under `out_dir` and return the path."""
+def build(cluster: str, out_dir: str = _DEFAULT_OUT, velmodel: str = "kim1983") -> str:
+    """Write 03_results_<cluster>.ipynb under `out_dir` and return the path. `velmodel` sets
+    which velocity model's .sum / relocation / mechanisms the notebook reads (default kim1983)."""
     for c in C:                                   # inject the cluster name + clear the eq-cycle's
         if c.cell_type == "code" and 'CLUSTER    = "gwangyang"' in c.source:   # _pnplus suffix
             c.source = c.source.replace('CLUSTER    = "gwangyang"', f'CLUSTER    = "{cluster}"')
@@ -393,6 +394,7 @@ def build(cluster: str, out_dir: str = _DEFAULT_OUT) -> str:
             # side-by-side run), so point the notebook there. The template defaults to `_pnplus`
             # because the source clusters keep a stead vs phasenet_plus comparison.
             c.source = c.source.replace('RUN_SUFFIX = "_pnplus"', 'RUN_SUFFIX = ""')
+            c.source = c.source.replace('VELMODEL   = "kim1983"', f'VELMODEL   = "{velmodel}"')
     nb["cells"] = C
     nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
     os.makedirs(out_dir, exist_ok=True)

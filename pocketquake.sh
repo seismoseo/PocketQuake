@@ -80,6 +80,9 @@ OPTIONS
                                   before the pipeline started.
   --skip-pipeline                 skip the eq-cycle relocation chain AND the results notebook
                                   (download + scaffold only — for testing the fetch paths).
+  --velmodel {kim1983|kim2011}    velocity model for the relocation + focal mechanisms +
+                                  results notebook (default kim1983). Location still computes
+                                  all models. (Fortran path fully; --python keeps its EikoNet.)
   --cores N                       cap xcorr workers (forwarded to the eq-cycle CLI's --cores;
                                   default: each cluster's cfg.num_cores, typically 10). Set lower
                                   on memory-constrained boxes (~24 GB/worker observed).
@@ -110,7 +113,7 @@ hdr(){ echo; echo "▸ $*"; }
 # ---- arguments ----
 [[ $# -lt 2 ]] && usage 1
 CATALOG="$1"; SLUG="$2"; shift 2
-EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""
+EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""; VELMODEL="kim1983"
 LOC_BACKEND="hypoinverse"; RELOC_BACKEND="hypodd"; LOC_SET=0; RELOC_SET=0; PYTHON_SHORTCUT=0; COMPARE=0
 SKIP_DOWNLOAD=0; SKIP_PIPELINE=0
 while [[ $# -gt 0 ]]; do
@@ -129,6 +132,7 @@ while [[ $# -gt 0 ]]; do
         --skip-download)   SKIP_DOWNLOAD=1; shift ;;
         --skip-pipeline)   SKIP_PIPELINE=1; shift ;;
         --cores)           CORES="$2"; shift 2 ;;
+        --velmodel)        VELMODEL="$2"; shift 2 ;;
         --fg|--foreground) FG=1; shift ;;
         -h|--help)         usage 0 ;;
         *) fail "unknown option: $1" ;;
@@ -272,6 +276,7 @@ ok "reloc-bcknd: $RELOC_BACKEND"
 ok "source:      $SOURCE"
 [[ -n "$STP_CUTOFF" ]] && ok "stp-cutoff:  $STP_CUTOFF (events >= this date skip STP)"
 [[ -n "$CORES"      ]] && ok "cores:       $CORES (xcorr worker cap)"
+ok "velmodel:    $VELMODEL (relocation + focal mech + notebook)"
 [[ -n "$MAINSHOCK"  ]] && ok "mainshock:   $MAINSHOCK (treatment will be applied after default run)"
 
 # ---- the orchestrator command ----
@@ -287,6 +292,7 @@ CMD=(
 )
 [[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
 [[ -n "$CORES"          ]] && CMD+=(--cores "$CORES")
+[[ -n "$VELMODEL"       ]] && CMD+=(--velmodel "$VELMODEL")
 [[ "$SKIP_DOWNLOAD" == "1" ]] && CMD+=(--skip-download)
 [[ "$SKIP_PIPELINE" == "1" ]] && CMD+=(--skip-pipeline)
 LOG="$HERE/${SLUG}_run.log"

@@ -167,7 +167,8 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 run_focal_mechanism: bool = True,
                 skip_download: bool = False,
                 skip_pipeline: bool = False,
-                cores: int | None = None) -> dict:
+                cores: int | None = None,
+                velmodel: str = "kim1983") -> dict:
     """End-to-end: scaffold → waveform download → register → eq-cycle pipeline → results notebook.
 
     `wf_backend` picks the waveform source:
@@ -236,9 +237,15 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
 
     # 3. eq-cycle pipeline through dt.cc
     if not skip_pipeline:
-        extra = ["--cores", str(cores)] if cores is not None else None
+        # --arc-velmodel drives ph2dt + the dt.ct/dt.cc relocation (and the notebook reads the
+        # same model's .sum). For the Fortran path this fully selects the velocity model; for
+        # --python the HypoSVI EikoNet still follows its bundled weights.
+        extra = ["--arc-velmodel", velmodel]
+        if cores is not None:
+            extra += ["--cores", str(cores)]
         print("\n[pocketquake] running the eq-cycle relocation chain"
-              + (f"  (xcorr workers capped at {cores})" if cores is not None else ""))
+              + (f"  (velmodel {velmodel}"
+                 + (f", xcorr workers capped at {cores}" if cores is not None else "") + ")"))
         _run_eqcycle_stage(cluster, through="dtcc", picker=picker, extra=extra)
 
         # Guard: if 0 events were located (e.g. --skip-download with no waveforms on disk,
@@ -258,14 +265,15 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         if run_focal_mechanism:
             print("\n[pocketquake] running the focal_mechanism stage")
             _run_eqcycle_stage(cluster, stage_from="focal_mechanism",
-                               through="focal_mechanism", picker=picker)
+                               through="focal_mechanism", picker=picker,
+                               extra=["--fm-velmodel", velmodel])
 
     # 5. build + execute the results notebook (only when the pipeline ran — the notebook
     # reads the sum files the pipeline produces; skipping the pipeline + executing the
     # notebook is guaranteed to FileNotFoundError on Yeongyang.sum / etc.)
     if not skip_pipeline:
         print("\n[pocketquake] generating + executing the results notebook")
-        nb_path = build_results_nb.build(cluster)
+        nb_path = build_results_nb.build(cluster, velmodel=velmodel)
         _execute_notebook(nb_path)
     else:
         print("\n[pocketquake] --skip-pipeline set; skipping the results notebook too "
@@ -330,6 +338,10 @@ def main(argv: list[str] | None = None) -> None:
                          "min(N, |sched_getaffinity|). Default (None) → uses each cluster's "
                          "`cfg.num_cores` (typically 10). Set lower on memory-constrained boxes "
                          "(observed: ~24 GB / worker on Yeoncheon's dt.cc xcorr).")
+    ap.add_argument("--velmodel", default="kim1983",
+                    help="Velocity model for the relocation (ph2dt + dt.ct/dt.cc via "
+                         "--arc-velmodel), focal mechanisms, and the results notebook. The "
+                         "location stage still computes all cfg.velocity_models. Default kim1983.")
     args = ap.parse_args(argv)
 
     orchestrate(
@@ -350,6 +362,7 @@ def main(argv: list[str] | None = None) -> None:
         skip_download=args.skip_download,
         skip_pipeline=args.skip_pipeline,
         cores=args.cores,
+        velmodel=args.velmodel,
     )
 
 
