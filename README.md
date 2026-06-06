@@ -1,5 +1,7 @@
 # PocketQuake
 
+[![Docs](https://readthedocs.org/projects/pocketquake/badge/?version=latest)](https://pocketquake.readthedocs.io/)
+
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
 ![Chungju Feb 2025 — 4-event time-lapse animation in the fault frame](examples/chungju/figures/00_seismicity_animation.gif)
