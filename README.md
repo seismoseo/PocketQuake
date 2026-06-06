@@ -168,18 +168,20 @@ Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](d
 | `--mainshock UTC_YYYYMMDDHHMMSS` | add Gwangyang-style mainshock treatment (builds a `_main` notebook) |
 | `--mainshock-only` | re-run only the mainshock treatment on an existing cluster |
 | `--picker {phasenet_plus\|stead}` | picker model (default `phasenet_plus`; `stead` needs no EQNet) |
+| `--velmodel {kim1983\|kim2011}` | velocity model for relocation + focal mechanisms + notebook (default kim1983) |
 | `--cores N` | cap xcorr workers (default per-cluster, ~10; lower it on small-RAM boxes) |
 | `--epi LAT,LON` · `--bounds LAT0,LAT1,LON0,LON1` | override the auto-derived epicenter / region |
 | `--fg` | run in the foreground (default: background via `nohup`, logs to `<slug>_run.log`) |
 
-**Velocity model.** The location stage runs **both** kim1983 and kim2011 (HYPOINVERSE / HypoSVI),
-and relocation + the results notebook use **kim1983** by default. `pocketquake.sh` has no
-velocity-model switch yet; to relocate with kim2011 today, call the eq-cycle CLI directly:
+**Velocity model.** The location stage always computes **both** kim1983 and kim2011 (HYPOINVERSE /
+HypoSVI); `--velmodel` (default `kim1983`) selects which one drives the **relocation** (ph2dt +
+dt.ct/dt.cc), the **focal mechanisms**, and the **results notebook**:
 
 ```bash
-python -m pipeline.cli.run_pipeline --cluster <slug> --through dtcc --arc-velmodel kim2011
+./pocketquake.sh catalog.csv myrun --velmodel kim2011
 ```
-(`--arc-velmodel` drives ph2dt + the dt.ct/dt.cc relocation; `--fm-velmodel` the focal mechanisms.)
+This fully selects the model for the Fortran path; with `--python`, HypoSVI keeps its bundled
+EikoNet weights for location while the relocation + notebook follow `--velmodel`.
 
 ## Gallery — what the notebook actually shows
 
