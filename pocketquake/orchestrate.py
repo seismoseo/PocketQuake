@@ -67,6 +67,20 @@ def _execute_notebook(path: str, timeout: int = 3600) -> None:
           f"--ExecutePreprocessor.timeout={timeout}", path])
 
 
+def _located_count(cluster: str) -> int:
+    """Events located across the cluster's HYPOINVERSE/HypoSVI `.sum` files (header-only = 0).
+    Used to bail clearly when nothing was located rather than crash downstream."""
+    import glob
+    pat = os.path.join(EQCYCLE_DIR, "pipeline", "runs", cluster, "1.HypoInv", "*", "*.sum")
+    n = 0
+    for p in glob.glob(pat):
+        try:
+            n = max(n, sum(1 for _ in open(p)) - 1)   # minus the header line
+        except OSError:
+            pass
+    return max(0, n)
+
+
 def _load_cluster_cfg(cluster: str):
     """Re-load the just-written cluster config so we get the ClusterConfig (with
     stp_sac_root / radius_km / etc.), not the bare ClusterSpec."""
@@ -226,6 +240,19 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         print("\n[pocketquake] running the eq-cycle relocation chain"
               + (f"  (xcorr workers capped at {cores})" if cores is not None else ""))
         _run_eqcycle_stage(cluster, through="dtcc", picker=picker, extra=extra)
+
+        # Guard: if 0 events were located (e.g. --skip-download with no waveforms on disk,
+        # or every pick below threshold), the .sum is header-only and the focal-mechanism +
+        # notebook stages have nothing to read. Stop with a clear, actionable message instead
+        # of crashing deep inside a reader.
+        if _located_count(cluster) == 0:
+            print("\n[pocketquake] ✗ 0 events located — nothing to relocate or plot.\n"
+                  "    Most likely: no waveforms on disk. If you passed --skip-download, the\n"
+                  f"    waveforms must already be under {waveforms_dir} — drop --skip-download\n"
+                  "    to fetch them, or point at the slug that already has them.\n"
+                  "    (Also check picks cleared threshold: see the 'picking: N picks' line above.)")
+            return dict(src_root=info["src_root"], cluster_module=info["module"],
+                        waveforms_dir=waveforms_dir, notebook=None)
 
         # 4. focal mechanisms (separate stage; PhaseNet+ picks already exist)
         if run_focal_mechanism:

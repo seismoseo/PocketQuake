@@ -146,14 +146,40 @@ python -m pipeline.core.fetch_eikonet            # pretrained kim1983 + kim2011 
 ```
 
 The absolute epicentre can differ between modes (HypoSVI vs HYPOINVERSE) — that centroid
-offset is normal and not what double-difference relocation constrains. Full Python recipe
-(GPU, training your own velocity model): [docs/python_backend/README.md](external/korea-cluster-relocation/docs/python_backend/README.md).
-The default Fortran path is unchanged. Full recipe (incl. training your own velocity model):
+offset is normal and not what double-difference relocation constrains. The default Fortran path
+is unchanged. Full Python recipe (GPU, training your own velocity model):
 [docs/python_backend/README.md](external/korea-cluster-relocation/docs/python_backend/README.md).
 
 External binaries (`hyp1.40`, `hypoDD`, `mseed2sac`, etc.) are not pip-installable — see
 [docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md) for build instructions per tool.
 Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
+### Command-line options
+
+`./pocketquake.sh CATALOG SLUG [options]` — the common ones (run `./pocketquake.sh --help` for all):
+
+| Option | What it does |
+|---|---|
+| `--python` | pure-Python backend (= `--loc-backend hyposvi --reloc-backend relocdd_py`) |
+| `--compare` | run Fortran **and** Python on the same picks → side-by-side `04_compare_<slug>.ipynb` |
+| `--source {necis\|stp\|mixed}` | waveform source (default `necis`; use `stp`/`mixed` for **pre-2020** events) |
+| `--skip-download` | reuse waveforms already on disk — skip the (slow) download stage |
+| `--skip-pipeline` | scaffold + download only (skip relocation + notebook) |
+| `--mainshock UTC_YYYYMMDDHHMMSS` | add Gwangyang-style mainshock treatment (builds a `_main` notebook) |
+| `--mainshock-only` | re-run only the mainshock treatment on an existing cluster |
+| `--picker {phasenet_plus\|stead}` | picker model (default `phasenet_plus`; `stead` needs no EQNet) |
+| `--cores N` | cap xcorr workers (default per-cluster, ~10; lower it on small-RAM boxes) |
+| `--epi LAT,LON` · `--bounds LAT0,LAT1,LON0,LON1` | override the auto-derived epicenter / region |
+| `--fg` | run in the foreground (default: background via `nohup`, logs to `<slug>_run.log`) |
+
+**Velocity model.** The location stage runs **both** kim1983 and kim2011 (HYPOINVERSE / HypoSVI),
+and relocation + the results notebook use **kim1983** by default. `pocketquake.sh` has no
+velocity-model switch yet; to relocate with kim2011 today, call the eq-cycle CLI directly:
+
+```bash
+python -m pipeline.cli.run_pipeline --cluster <slug> --through dtcc --arc-velmodel kim2011
+```
+(`--arc-velmodel` drives ph2dt + the dt.ct/dt.cc relocation; `--fm-velmodel` the focal mechanisms.)
 
 ## Gallery — what the notebook actually shows
 

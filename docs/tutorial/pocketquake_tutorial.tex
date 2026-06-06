@@ -315,6 +315,28 @@ and the SKHASH-inferred S/P amplitude ratios (right).
 \end{enumerate}
 \end{frame}
 
+% ----------------------------------------------------------------- options reference
+\begin{frame}[fragile]{Command-line options (\texttt{./pocketquake.sh -{}-help})}
+\footnotesize
+\begin{description}
+  \item[\texttt{-{}-python}] pure-Python backend (HypoSVI + relocDD-py; no Fortran)
+  \item[\texttt{-{}-compare}] run Fortran \emph{and} Python on the same picks $\to$ side-by-side notebook
+  \item[\texttt{-{}-source necis\,|\,stp\,|\,mixed}] waveform source (default \texttt{necis}; use
+        \texttt{stp}/\texttt{mixed} for \textbf{pre-2020} events)
+  \item[\texttt{-{}-skip-download}] reuse waveforms already on disk (skip the slow download)
+  \item[\texttt{-{}-skip-pipeline}] scaffold + download only (no relocation / notebook)
+  \item[\texttt{-{}-mainshock <UTC>}] add Gwangyang-style mainshock treatment (\texttt{\_main} notebook)
+  \item[\texttt{-{}-picker phasenet\_plus\,|\,stead}] picker model (\texttt{stead} needs no EQNet)
+  \item[\texttt{-{}-cores N}] cap xcorr workers (default $\sim$10)
+  \item[\texttt{-{}-epi},\,\texttt{-{}-bounds}] override the auto-derived epicenter / region
+  \item[\texttt{-{}-fg}] foreground (default: background, logs to \texttt{<slug>\_run.log})
+\end{description}
+\smallskip
+\textbf{Velocity model:} located with both kim1983 + kim2011; relocation + notebook use
+\textbf{kim1983} by default. To relocate with kim2011, call the eq-cycle CLI directly:
+\texttt{python -m pipeline.cli.run\_pipeline -{}-cluster <slug> -{}-through dtcc -{}-arc-velmodel kim2011}.
+\end{frame}
+
 % ----------------------------------------------------------------- troubleshooting
 \begin{frame}[fragile]{Common pitfalls (\texttt{docs/TROUBLESHOOTING.md})}
 \begin{description}
