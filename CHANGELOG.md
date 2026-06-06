@@ -3,6 +3,53 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.8.0 — 2026-06-05
+
+A fully **Fortran-free** relocation path: HypoSVI + EikoNet for absolute location and
+relocDD-py for relative relocation, opt-in alongside the unchanged default Fortran chain
+(`hyp1.40` + `ph2dt` + `hypoDD`). It reproduces the Fortran workflow: on chungju the
+**relative** (translation-removed) locations match `hypoDD` to **1 m horizontal / 3 m
+depth**, and on identical input the relocators agree to ~1.3 m. The absolute epicentre can
+differ (HypoSVI vs HypoInverse) — that centroid offset is expected and not constrained by
+the data.
+
+**Added**
+- **`--python`** shortcut (= `--loc-backend hyposvi --reloc-backend relocdd_py`) and
+  **`--compare`**, which runs both pipelines on the same picks and builds an executed
+  `04_compare_<slug>.ipynb` (HYPOINVERSE vs HypoSVI; ff vs pp; absolute + final).
+- **HypoSVI backend** (`pipeline/core/hyposvi_backend.py`): picks → HypoSVI/EikoNet →
+  HYPOINVERSE-format `.sum`. SVGD particles are seeded inside each cluster's `region_bounds`.
+- **relocDD-py backend** (`pipeline/core/relocdd_py_backend.py`): Fortran-free `phase.dat`
+  generation from any `.sum` + picks → relocDD-py's own ph2dt → hypoDD.
+- **Solver parity with Fortran**: SVD up to the `hypoDD` `MAXDATA0` limit (10000 diff-times,
+  probed from the binary), then automatic LSQR with the condition-number (CND→40–80) adaptive
+  damping search — the same SVD→LSQR fallback the Fortran path uses.
+- **Bootstrap 95% uncertainties** (`relocdd_py_backend.bootstrap_relocation`): resample the
+  differential times and re-invert with the inversion held fixed — the same headline error
+  bars as the Fortran workflow (HypoDD's formal LSQR errors underestimate). The results
+  notebook dispatches the bootstrap engine on the relocation backend.
+- **relocDD-py hardening** (`_ensure_relocdd_patches`, idempotent, no subrepo edits): fixes
+  upstream bugs that surface on real dense data — chiefly an `int8` event-pair-count overflow
+  (>127 diff-times/pair wraps negative and corrupts clustering) plus divide-by-zero guards in
+  the statistics routines, the SVD `resstat()` arg, an empty-`.reloc` fallback, and `ISTART=1`.
+- **Pretrained EikoNet weights** for kim1983 + kim2011, shipped via the `eikonet-weights-v1`
+  GitHub release; `python -m pipeline.core.fetch_eikonet` downloads them and the backend
+  auto-discovers them (no `.env` editing).
+- **`pipeline/core/eikonet_train.py`**: train any 1-D model, including your own via
+  `--vel-csv depth_km,vp_kms,vs_kms`; `--device auto` uses the GPU.
+- Config knobs: `loc_backend`, `reloc_backend`, `hyposvi_*`, `relocdd_py_dir`.
+
+**Fixed**
+- `run_dtcc` for `relocdd_py` now uses the Fortran-free path (was dispatching to a route
+  that fed relocDD-py the Fortran `event.dat`, which its parser can't read).
+- The `ph2dt` stage is skipped for `relocdd_py` (it required a HYPOINVERSE `.arc` HypoSVI
+  doesn't produce); relocDD-py rebuilds `dt.ct` from the `.sum` in its dtct/dtcc stages.
+
+**Notes**
+- Default `hypoinverse` / `hypodd` path is byte-for-byte unchanged.
+- `pocketquake.sh` fails fast if the interpreter lacks `playwright` (NECIS/mixed runs), and
+  on a missing `RELOCDD_PY_DIR` / bundled EikoNet weights for the `--python` path.
+
 ## 1.4.0 — 2026-06-01
 
 Adds a cumulative seismicity time-lapse animation in the same 4-panel fault-frame

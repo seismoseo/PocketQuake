@@ -18,6 +18,8 @@ before the default pipeline can run end-to-end.
 | **SKHASH** | **default focal-mechanism stage** | `git clone` (steps below) | `SKHASH_DIR` env var |
 | `stp-client.pl` | only `--source stp` / `mixed` | contact SGTL lab @ SNU | `STP_PERL_SCRIPT` env var or on `$PATH` |
 | Helvetica fonts | only nicer plot text | optional — DejaVu Sans fallback | `HELVETICA_DIR` env var |
+| **relocDD-py** | only `--reloc-backend relocdd_py` (Fortran-free reloc) | `git clone` (steps below) | `RELOCDD_PY_DIR` env var |
+| **HypoSVI + EikoNet** | only `--loc-backend hyposvi` (Fortran-free location) | `git clone` + train EikoNet | `HYPOSVI_EIKONET_P/S` env vars |
 
 The default pipeline assumes you have everything except STP and Helvetica.
 If you want a minimum-viable run without focal mechanisms, see [INSTALL.md](INSTALL.md) §6.
@@ -144,6 +146,67 @@ echo "STP_PERL_SCRIPT=/path/to/stp-client.pl" >> .env
 # Option C — a fully custom command line
 echo "STP_CMD=/opt/perl/5.38/bin/perl /path/to/stp-client.pl" >> .env
 ```
+
+---
+
+## Python relocation backends (optional — a Fortran-free pipeline)
+
+The default chain uses the compiled Fortran tools (`hyp1.40`, `ph2dt` + `hypoDD`).
+If you can't build those, PocketQuake can swap in pure-Python equivalents. They are
+**opt-in** and selected per run:
+
+```bash
+# Fortran-free relative relocation (drop-in for ph2dt + hypoDD)
+./pocketquake.sh catalog.csv myslug --reloc-backend relocdd_py
+# Fortran-free absolute location (drop-in for hyp1.40) — needs a trained EikoNet
+./pocketquake.sh catalog.csv myslug --loc-backend hyposvi --reloc-backend relocdd_py
+```
+
+The default (`--loc-backend hypoinverse --reloc-backend hypodd`) is unchanged and
+remains the supported reference path; the Python chain is a different solver and
+will not be bit-identical.
+
+### relocDD-py (`--reloc-backend relocdd_py`)
+
+A Python port of hypoDD v1.3.
+
+```bash
+# 1. Clone next to PocketQuake
+git clone https://github.com/katie-biegel/relocDD-py.git
+# 2. Point PocketQuake at it
+echo "RELOCDD_PY_DIR=$PWD/relocDD-py" >> .env
+# 3. Deps (numpy/scipy/pandas) are already covered by environment.yml.
+```
+
+PocketQuake templates relocDD-py's `run.inp` / `hypoDD.inp` for you and parses its
+`hypoDD.reloc` back into the same 24-column schema the Fortran path produces, so the
+results notebook is identical. **It pins `ISTART=2` (start from catalog locations)
+and `ISOLV=2` (LSQR)** internally to avoid two crashes in the current relocDD-py
+release (the `ISTART=1` and `ISOLV=1` code paths are broken upstream); you don't need
+to configure anything.
+
+### HypoSVI + EikoNet (`--loc-backend hyposvi`)
+
+A Stein-variational hypocenter locator. Unlike hyp1.40 it doesn't take a layered
+velocity model directly — it calls a **pre-trained EikoNet** (a neural travel-time
+field) that you train once per velocity model.
+
+```bash
+# 1. Clone next to PocketQuake
+git clone https://github.com/Ulvetanna/HypoSVI.git
+git clone https://github.com/Ulvetanna/EikoNet.git
+echo "HYPOSVI_DIR=$PWD/HypoSVI" >> .env
+echo "EIKONET_DIR=$PWD/EikoNet" >> .env
+# 2. Fetch the pretrained EikoNet weights (kim1983 + kim2011) — one command:
+python -m pipeline.core.fetch_eikonet
+#    (the backend auto-discovers them; no HYPOSVI_EIKONET_P/S needed.)
+# 3. Run:  ./pocketquake.sh catalog.csv slug --python
+```
+
+> **Status (v1.8.0):** both backends are wired and validated. On chungju the Fortran
+> and Python pipelines agree to ~190 m (absolute) / ~150 m horizontal (final). Use
+> `--python`, or `--compare` to see them side by side. Full recipe (including training
+> your own velocity model with `--vel-csv`): **docs/python_backend/README.md**.
 
 ---
 

@@ -73,7 +73,8 @@ co(r"""display(viz.relocation_counts(cfg, VELMODEL))""")
 md("""### Location uncertainty — bootstrap 95%
 
 HypoDD's own (LSQR a-posteriori) errors badly **underestimate** the true relative-location uncertainty.
-We instead estimate it by **bootstrapping the differential-time data** (`hypodd.bootstrap_relocation`):
+We instead estimate it by **bootstrapping the differential-time data** (the relocation backend's
+`bootstrap_relocation` — Fortran hypoDD or relocDD-py, same resampling/percentile procedure):
 pool all dt observations, resample with replacement, regroup, and re-run HypoDD `N_BOOT` times with the
 inversion held fixed (the calibrated `hypoDD.inp`). Each replica is **seeded from the converged relocation**
 (so the bar measures the data-driven spread *around the solution*, not the ability to re-converge from a
@@ -84,12 +85,20 @@ run is slow, then instant). The plots also **drop events the bootstrap flags as 
 (`viz._boot_underconstrained`) and note the count, and **circles scale by KMA local magnitude**.""")
 co(r"""from pipeline.core import hypodd, sumio
 import numpy as _np
+# Bootstrap engine follows the relocation backend: relocDD-py re-inverts its own clusters
+# (pure-Python path), Fortran hypoDD re-inverts the Fortran ones. Same resampling/percentile
+# procedure either way (relocdd_py_backend.bootstrap_relocation mirrors hypodd's).
+if getattr(cfg, "reloc_backend", "hypodd") == "relocdd_py":
+    from pipeline.core import relocdd_py_backend as _rddpy
+    _bootstrap = _rddpy.bootstrap_relocation
+else:
+    _bootstrap = hypodd.bootstrap_relocation
 _rows = []
 for _lab, _br in (("dt.ct", "dtct"), ("dt.cc", "dtcc")):
     _bdir = config.dtct_dir(cfg) if _br == "dtct" else config.dtcc_dir(cfg)
     if not os.path.exists(os.path.join(_bdir, "hypoDD.reloc")):
         continue
-    _bb = hypodd.bootstrap_relocation(cfg, branch=_br, n=N_BOOT, seed=BOOT_SEED)   # cached
+    _bb = _bootstrap(cfg, branch=_br, n=N_BOOT, seed=BOOT_SEED)   # cached
     _rl = sumio.read_reloc(os.path.join(_bdir, "hypoDD.reloc"))
     _rows.append(dict(branch=_lab, events=len(_rl), n_with_CI=int(_bb.ex95.notna().sum()),
                       ex95_boot_m=_np.nanmedian(_bb.ex95), ey95_boot_m=_np.nanmedian(_bb.ey95),
@@ -108,7 +117,7 @@ genuinely larger uncertainty (e.g. set `BOOT_DROP_VERT_KM=0.5` for shallow swarm
 control is unrealistic).""")
 co(r"""_bdir = config.dtcc_dir(cfg)
 if os.path.exists(os.path.join(_bdir, "hypoDD.reloc")):
-    _bb = hypodd.bootstrap_relocation(cfg, branch="dtcc", n=N_BOOT, seed=BOOT_SEED)
+    _bb = _bootstrap(cfg, branch="dtcc", n=N_BOOT, seed=BOOT_SEED)
     _rl = sumio.read_reloc(os.path.join(_bdir, "hypoDD.reloc"))[["id","nccp","nccs","nctp","ncts"]]
     _t = _rl.merge(_bb[["id","n_boot","ex95","ey95","ez95"]], on="id")
     _t["horiz95_m"] = _np.hypot(_t.ex95, _t.ey95)
@@ -192,8 +201,11 @@ else:
     _pf = sorted(_glob.glob(os.path.join(config.picks_dir(cfg), "*_picks.csv")))
     SAMPLE_EVENT = os.path.basename(_pf[0]).split("_")[0] if _pf else None
 print("Sample event:", SAMPLE_EVENT)
-viz.plot_3c(cfg, SAMPLE_EVENT); plt.show()
-viz.plot_polarities(cfg, SAMPLE_EVENT); plt.show()""")
+if SAMPLE_EVENT is None:
+    print("(no mechanism table and no picks found — skipping the sample 3-C / polarity plots)")
+else:
+    viz.plot_3c(cfg, SAMPLE_EVENT); plt.show()
+    viz.plot_polarities(cfg, SAMPLE_EVENT); plt.show()""")
 
 md("""### Picks QC — distance record section per event
 

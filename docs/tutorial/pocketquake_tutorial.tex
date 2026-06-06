@@ -32,7 +32,7 @@
 
 \title{PocketQuake}
 \subtitle{From a catalog CSV to a relocation notebook in one command}
-\author{seismoseo / SGTL, SNU}
+\author{Min-Seong Seo / SGTL, SNU}
 \date{}
 
 \begin{document}
@@ -53,7 +53,7 @@ relocation + focal-mechanism notebook. It glues two specialised submodules:
 \bigskip
 \textbf{One command, end to end:}
 \begin{lstlisting}
-./pocketquake.sh examples/chungju/chungju_catalog.csv chungju_smoke
+./pocketquake.sh ./examples/chungju/chungju_catalog.csv chungju
 \end{lstlisting}
 \bigskip
 Output: an executed Jupyter notebook with maps, depth sections, and beachball
@@ -144,6 +144,11 @@ echo "SKHASH_DIR=$PWD/SKHASH/SKHASH" >> ~/PocketQuake/.env
 \smallskip
 Full per-tool source + build instructions:
 \textbf{docs/EXTERNAL\_TOOLS.md}.
+\smallskip
+\footnotesize
+\textbf{Pure-Python option (\texttt{--python}):} replaces the Fortran
+\texttt{hyp1.40} + \texttt{ph2dt}/\texttt{hypoDD} with HypoSVI\,+\,EikoNet
+and \texttt{relocDD-py} --- no Fortran build needed. See the next-but-one slide.
 \end{frame}
 
 % ----------------------------------------------------------------- catalog format
@@ -170,13 +175,13 @@ Year,Month,Day,Hour,Minute,Second,Latitude,Longitude,Magnitude,Depth
 % ----------------------------------------------------------------- run
 \begin{frame}[fragile]{Run the chungju example}
 \begin{lstlisting}[language=bash]
-./pocketquake.sh examples/chungju/chungju_catalog.csv chungju_smoke
+./pocketquake.sh ./examples/chungju/chungju_catalog.csv chungju
 \end{lstlisting}
 \smallskip
 The wrapper:
 \begin{enumerate}
   \item scaffolds a cluster dir under
-        \texttt{external/korea-cluster-relocation/chungju\_smoke\_cluster/}
+        \texttt{external/korea-cluster-relocation/chungju\_cluster/}
   \item downloads NECIS waveforms (Playwright drives the JS portal,
         polls the staging queue, streams the FTP files)
   \item runs PhaseNet+ $\to$ HypoInverse $\to$ HypoDD $\to$ SKHASH
@@ -185,11 +190,46 @@ The wrapper:
 \smallskip
 Useful flags:
 \begin{itemize}
+  \item \texttt{--python} --- pure-Python relocation backend (no Fortran; next slide)
   \item \texttt{--source mixed} --- per-event STP+NECIS dispatch
   \item \texttt{--picker stead} --- SeisBench PhaseNet (no EQNet needed)
   \item \texttt{--mainshock <UTC>} --- Gwangyang-style mainshock treatment
   \item \texttt{--cores N} --- cap xcorr workers (default 10)
 \end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------- pure-python backend
+\begin{frame}[fragile]{Pure-Python backend (\texttt{--python})}
+A Fortran-free relocation chain that drops in for \texttt{hyp1.40} + \texttt{hypoDD}:
+\begin{itemize}
+  \item \textbf{HypoSVI + EikoNet} --- absolute location by Stein variational
+        inference over a neural-network travel-time field (pretrained weights shipped).
+  \item \textbf{relocDD-py} --- Katherine Biegel's Python port of \texttt{hypoDD}
+        for the double-difference relocation.
+\end{itemize}
+\smallskip
+One-time setup (no compiler) --- clone the three tools, fetch the weights:
+\begin{lstlisting}[language=bash]
+git clone https://github.com/katie-biegel/relocDD-py.git
+git clone https://github.com/Ulvetanna/HypoSVI.git
+git clone https://github.com/Ulvetanna/EikoNet.git
+cat >> ~/PocketQuake/.env <<ENV
+RELOCDD_PY_DIR=$PWD/relocDD-py
+HYPOSVI_DIR=$PWD/HypoSVI
+EIKONET_DIR=$PWD/EikoNet
+ENV
+python -m pipeline.core.fetch_eikonet   # pretrained kim1983 + kim2011
+\end{lstlisting}
+\smallskip
+\begin{lstlisting}[language=bash]
+./pocketquake.sh ./examples/chungju/chungju_catalog.csv chungju --python
+\end{lstlisting}
+\smallskip
+\footnotesize
+Faithful to the Fortran chain: relative locations match \texttt{hypoDD} to
+$\sim$1\,m on identical input; same SVD$\to$LSQR auto-fallback with adaptive
+condition-number damping, and the same bootstrap 95\% error bars. The absolute
+epicentre can differ (HypoSVI vs HypoInverse) --- that centroid offset is expected.
 \end{frame}
 
 % ----------------------------------------------------------------- progress
@@ -198,7 +238,7 @@ Useful flags:
 \textbf{Default} (background): \texttt{nohup.out} in the working directory.
 \bigskip
 \begin{lstlisting}[language=bash]
-[pocketquake] scaffolding chungju_smoke_cluster ...
+[pocketquake] scaffolding chungju_cluster ...
 [necis] login OK; submitting request for 4 event(s)
 [necis] request id 4f3a... status=P -> C, downloading 4 SAC bundles
 [eqcycle] picking with phasenet_plus (~30s/event)
@@ -206,7 +246,7 @@ Useful flags:
 [eqcycle] xcorr 6 pairs (10 workers) ...
 [eqcycle] dt.cc -> hypoDD reloc OK (4 events)
 [eqcycle] focal_mechanism: 4 SKHASH solutions
-[pocketquake] executing 03_results_chungju_smoke.ipynb
+[pocketquake] executing 03_results_chungju.ipynb
 \end{lstlisting}
 \smallskip
 Wall-clock for chungju: $\sim$15 min on a 16-core box.
@@ -227,7 +267,7 @@ All four solutions converge on a near-vertical N--S right-lateral strike-slip pl
 % ----------------------------------------------------------------- output 2
 \begin{frame}{Output 2 --- Depth sections}
 \begin{center}
-\includegraphics[width=0.85\textwidth,height=0.72\textheight,keepaspectratio]{figures/03_depth_sections.png}
+\includegraphics[width=0.8\textwidth]{figures/03_depth_sections.png}
 \end{center}
 \vspace{-0.5em}
 \scriptsize
@@ -240,9 +280,9 @@ $\sim$1\,km scatter (KMA bulletin) to $\sim$200\,m.
 \begin{frame}{Output 3 --- Beachball gallery + record section}
 \begin{columns}[T,onlytextwidth]
 \column{0.48\textwidth}
-\includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figures/04_beachball_gallery.png}
+\includegraphics[width=\textwidth]{figures/04_beachball_gallery.png}
 \column{0.48\textwidth}
-\includegraphics[width=\textwidth,height=0.7\textheight,keepaspectratio]{figures/06_record_section_M31.png}
+\includegraphics[width=\textwidth]{figures/06_record_section_M31.png}
 \end{columns}
 \vspace{0.5em}
 \scriptsize
@@ -313,7 +353,7 @@ and the SKHASH-inferred S/P amplitude ratios (right).
 \centering
 \textbf{\url{https://github.com/seismoseo/PocketQuake}} \\
 \smallskip
-\textit{Made by seismoseo / SGTL, SNU.}
+\textit{Made by Min-Seong Seo / SGTL, SNU.}
 \end{frame}
 
 \end{document}

@@ -47,9 +47,14 @@ dependencies:
   # PhaseNet+ on CPU just fine. For CUDA, install the matching wheel from
   # https://pytorch.org/ AFTER `conda activate pocketquake`.
   - pytorch>=2.0
+  # HypoSVI + EikoNet backend (the --python / --loc-backend hyposvi path) imports these
+  # at module load — undeclared deps of those external clones.
+  - seaborn>=0.12
+  - scikit-learn>=1.2
   # pip-installed packages (no current conda-forge build).
   # kaleido is optional (plotly static image export); pip-install it manually if
   # the results notebook needs PNG exports.
   - pip
   - pip:
       - seisbench>=0.11
+      - scikit-fmm>=2023.4.2        # EikoNet/HypoSVI fast-marching travel times

@@ -32,5 +32,11 @@ data/
 .idea/
 .DS_Store
 
+# Local dev-context notes (never publish)
+CLAUDE.md
+
 # scratch run logs
 *_run.log
+
+# tectonic build artifact (the tracked manual is PocketQuake_manual.pdf)
+docs/tutorial/pocketquake_tutorial.pdf

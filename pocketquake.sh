@@ -46,6 +46,21 @@ OPTIONS
   --epi LAT,LON                   override the auto-derived epicenter (catalog centroid)
   --bounds LAT0,LAT1,LON0,LON1    override the auto-derived bounds (catalog bbox + 0.2°)
   --picker {phasenet_plus|stead}  picker model (default: phasenet_plus)
+  --python                        shortcut for the pure-Python pipeline:
+                                  = --loc-backend hyposvi --reloc-backend relocdd_py.
+                                  Uses bundled EikoNet weights (fetch once with
+                                  `python -m pipeline.core.fetch_eikonet`).
+  --compare                       run the default (Fortran) pipeline, then re-run the
+                                  Python backend on the SAME picks and build an executed
+                                  04_compare_<slug>.ipynb (HYPOINVERSE vs HypoSVI and
+                                  ff vs pp, abs + final). Implies --fg.
+  --loc-backend {hypoinverse|hyposvi}
+                                  absolute-location backend (default: hypoinverse, Fortran hyp1.40).
+                                  hyposvi is the pure-Python path; uses a trained EikoNet
+                                  (bundled/auto-discovered, or HYPOSVI_EIKONET_P/S in .env).
+  --reloc-backend {hypodd|relocdd_py}
+                                  relative-relocation backend (default: hypodd, Fortran ph2dt+hypoDD).
+                                  relocdd_py is the pure-Python port; set RELOCDD_PY_DIR in .env.
   --source {necis|stp|mixed}      waveform source (default: necis). `mixed` dispatches
                                   per-event between STP and NECIS so a single cluster can span
                                   the STP/NECIS transition; default mode is try-STP-first with
@@ -96,12 +111,17 @@ hdr(){ echo; echo "▸ $*"; }
 [[ $# -lt 2 ]] && usage 1
 CATALOG="$1"; SLUG="$2"; shift 2
 EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""
+LOC_BACKEND="hypoinverse"; RELOC_BACKEND="hypodd"; LOC_SET=0; RELOC_SET=0; PYTHON_SHORTCUT=0; COMPARE=0
 SKIP_DOWNLOAD=0; SKIP_PIPELINE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
         --bounds)          BBOX="$2"; shift 2 ;;
         --picker)          PICKER="$2"; shift 2 ;;
+        --loc-backend)     LOC_BACKEND="$2"; LOC_SET=1; shift 2 ;;
+        --reloc-backend)   RELOC_BACKEND="$2"; RELOC_SET=1; shift 2 ;;
+        --python)          PYTHON_SHORTCUT=1; shift ;;
+        --compare)         COMPARE=1; shift ;;
         --source)          SOURCE="$2"; shift 2 ;;
         --stp-cutoff)      STP_CUTOFF="$2"; shift 2 ;;
         --mainshock)       MAINSHOCK="$2"; shift 2 ;;
@@ -117,6 +137,23 @@ done
 [[ "$SOURCE" == "necis" || "$SOURCE" == "stp" || "$SOURCE" == "mixed" ]] || fail "--source must be 'necis' | 'stp' | 'mixed' (got: $SOURCE)"
 [[ -n "$STP_CUTOFF" && "$SOURCE" != "mixed" ]] && fail "--stp-cutoff is only meaningful with --source mixed (got --source $SOURCE)"
 [[ "$MAIN_ONLY" == "1" && -z "$MAINSHOCK" ]] && fail "--mainshock-only requires --mainshock UTC_YYYYMMDDHHMMSS"
+# --python = pure-Python backends shortcut (= --loc-backend hyposvi --reloc-backend relocdd_py)
+if [[ "$PYTHON_SHORTCUT" == "1" ]]; then
+    [[ "$LOC_SET" == "1" && "$LOC_BACKEND" != "hyposvi" ]] && fail "--python implies --loc-backend hyposvi, conflicting with --loc-backend $LOC_BACKEND"
+    [[ "$RELOC_SET" == "1" && "$RELOC_BACKEND" != "relocdd_py" ]] && fail "--python implies --reloc-backend relocdd_py, conflicting with --reloc-backend $RELOC_BACKEND"
+    LOC_BACKEND="hyposvi"; RELOC_BACKEND="relocdd_py"
+fi
+# --compare runs the DEFAULT (Fortran) pipeline then re-runs the Python backend on the
+# same picks, so it cannot itself be a Python run; it also needs the full default pass.
+if [[ "$COMPARE" == "1" ]]; then
+    [[ "$PYTHON_SHORTCUT" == "1" || "$LOC_BACKEND" == "hyposvi" || "$RELOC_BACKEND" == "relocdd_py" ]] && \
+        fail "--compare runs the Fortran pipeline then compares the Python one — don't combine it with --python / --loc-backend hyposvi / --reloc-backend relocdd_py"
+    [[ "$MAIN_ONLY" == "1" ]] && fail "--compare is incompatible with --mainshock-only"
+    [[ "$SKIP_PIPELINE" == "1" ]] && fail "--compare needs the pipeline outputs; drop --skip-pipeline"
+    FG=1   # sequence the comparison after the pipeline
+fi
+[[ "$LOC_BACKEND" == "hypoinverse" || "$LOC_BACKEND" == "hyposvi" ]] || fail "--loc-backend must be 'hypoinverse' | 'hyposvi' (got: $LOC_BACKEND)"
+[[ "$RELOC_BACKEND" == "hypodd" || "$RELOC_BACKEND" == "relocdd_py" ]] || fail "--reloc-backend must be 'hypodd' | 'relocdd_py' (got: $RELOC_BACKEND)"
 
 # ---- preflight ----
 hdr "preflight"
@@ -150,8 +187,64 @@ case "$SOURCE" in
         ;;
 esac
 
+# ---- Python relocation-backend preflight (opt-in; default Fortran path skips these) ----
+# --compare also needs the Python backends (it re-runs pp on the same picks).
+if [[ "$RELOC_BACKEND" == "relocdd_py" || "$COMPARE" == "1" ]]; then
+    [[ -n "${RELOCDD_PY_DIR:-}" ]] || fail "Python relocation needs RELOCDD_PY_DIR in .env (path to the relocDD-py clone)"
+    [[ -f "$RELOCDD_PY_DIR/run.py" ]] || fail "RELOCDD_PY_DIR=$RELOCDD_PY_DIR has no run.py — is it a relocDD-py clone?"
+    ok "relocDD-py: $RELOCDD_PY_DIR"
+fi
+if [[ "$LOC_BACKEND" == "hyposvi" || "$COMPARE" == "1" ]]; then
+    if [[ -n "${HYPOSVI_EIKONET_P:-}" && -n "${HYPOSVI_EIKONET_S:-}" ]]; then
+        [[ -e "$HYPOSVI_EIKONET_P" ]] || fail "HYPOSVI_EIKONET_P=$HYPOSVI_EIKONET_P not found"
+        [[ -e "$HYPOSVI_EIKONET_S" ]] || fail "HYPOSVI_EIKONET_S=$HYPOSVI_EIKONET_S not found"
+        ok "HypoSVI EikoNet (env): P=$HYPOSVI_EIKONET_P"
+    else
+        # bundled auto-discovery: any eikonet_<vm>/<vm>_p with a meta.json + checkpoint
+        BUNDLED_META=$(ls "$EQDIR"/pipeline/velocity_models/eikonet_*/*_p/eikonet_meta.json 2>/dev/null | head -1)
+        [[ -n "$BUNDLED_META" ]] || fail "--loc-backend hyposvi: no EikoNet weights found. Fetch the bundled weights:
+    (cd $EQDIR && python -m pipeline.core.fetch_eikonet)
+  or set HYPOSVI_EIKONET_P / HYPOSVI_EIKONET_S in .env. See docs/python_backend/README.md."
+        ok "HypoSVI EikoNet: bundled weights present ($(ls -d "$EQDIR"/pipeline/velocity_models/eikonet_* 2>/dev/null | xargs -n1 basename | tr '\n' ' '))"
+    fi
+    # The HypoSVI SVGD locator + EikoNet Model class are external clones (not the weights) —
+    # needed to load the network. Check them up front so we fail here, not with an ImportError
+    # after download+picking.
+    EK_PATHS="${EIKONET_DIR:-}:${HYPOSVI_DIR:-}"
+    if ! PYTHONPATH="$EK_PATHS:${PYTHONPATH:-}" "$PY" -c "import EikoNet.model, HypoSVI.location" 2>/dev/null; then
+        fail "--loc-backend hyposvi needs the HypoSVI + EikoNet clones on the path. Clone them and set .env:
+    git clone https://github.com/Ulvetanna/HypoSVI.git && echo \"HYPOSVI_DIR=\$PWD/HypoSVI\" >> $HERE/.env
+    git clone https://github.com/Ulvetanna/EikoNet.git && echo \"EIKONET_DIR=\$PWD/EikoNet\" >> $HERE/.env
+  See docs/python_backend/README.md."
+    fi
+    ok "HypoSVI + EikoNet code: importable"
+fi
+
 [[ -x "$PY" ]] || fail "python interpreter not found (PY='$PY'). Set POCKETQUAKE_PYTHON=/path/to/python or put 'python3' on PATH."
 ok "python: $PY"
+
+# ---- fail fast if the chosen interpreter lacks NECIS deps (playwright) ----
+# NECIS uses a Playwright browser; mixed mode can fall back to NECIS mid-run. Without
+# this check the import only fails AFTER the multi-minute STP batch. Catch it up front.
+if [[ "$SOURCE" == "necis" || "$SOURCE" == "mixed" ]]; then
+    if ! "$PY" -c "import playwright" 2>/dev/null; then
+        # Try to point the user at an env that does have it (common: a conda env).
+        HINT=""
+        for cand in "$HOME"/miniforge3/envs/*/bin/python3 "$HOME"/miniconda3/envs/*/bin/python3 "$HOME"/anaconda3/envs/*/bin/python3; do
+            [[ -x "$cand" ]] && "$cand" -c "import playwright" 2>/dev/null && { HINT="$cand"; break; }
+        done
+        msg="'$PY' cannot import playwright, required for --source $SOURCE (NECIS). "
+        if [[ -n "$HINT" ]]; then
+            msg+="Found playwright in: $HINT
+  Re-run with:  POCKETQUAKE_PYTHON=$HINT ./pocketquake.sh ...   (or 'conda activate' that env first)"
+        else
+            msg+="Install it into this interpreter:  $PY -m pip install playwright && $PY -m playwright install chromium
+  (or set POCKETQUAKE_PYTHON to an env that already has it). See docs/INSTALL.md."
+        fi
+        fail "$msg"
+    fi
+    ok "playwright: importable (NECIS ready)"
+fi
 
 # ---- auto-derive epi / bbox from the catalog ----
 if [[ -z "$EPI" || -z "$BBOX" ]]; then
@@ -174,6 +267,8 @@ fi
 ok "epicenter:   $EPI"
 ok "region-bbox: $BBOX"
 ok "picker:      $PICKER"
+ok "loc-backend: $LOC_BACKEND"
+ok "reloc-bcknd: $RELOC_BACKEND"
 ok "source:      $SOURCE"
 [[ -n "$STP_CUTOFF" ]] && ok "stp-cutoff:  $STP_CUTOFF (events >= this date skip STP)"
 [[ -n "$CORES"      ]] && ok "cores:       $CORES (xcorr worker cap)"
@@ -187,6 +282,8 @@ CMD=(
     --region-bounds "$BBOX"
     --picker "$PICKER"
     --wf-backend "$SOURCE"
+    --loc-backend "$LOC_BACKEND"
+    --reloc-backend "$RELOC_BACKEND"
 )
 [[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
 [[ -n "$CORES"          ]] && CMD+=(--cores "$CORES")
@@ -209,6 +306,13 @@ elif [[ "$FG" == "1" ]]; then
     "${CMD[@]}" 2>&1 | tee "$LOG"
     DEFAULT_RC="${PIPESTATUS[0]}"
     [[ "$DEFAULT_RC" == "0" ]] || fail "default pipeline failed (exit $DEFAULT_RC)"
+    if [[ "$COMPARE" == "1" ]]; then
+        hdr "comparing Fortran vs Python backends (same picks)"
+        "$PY" -u -m pocketquake.compare_backends "$SLUG" 2>&1 | tee -a "$LOG"
+        CMP_RC="${PIPESTATUS[0]}"
+        [[ "$CMP_RC" == "0" ]] || fail "backend comparison failed (exit $CMP_RC)"
+        ok "comparison notebook: $EQDIR/pipeline/notebooks/04_compare_${SLUG}.ipynb"
+    fi
 elif [[ -z "$MAINSHOCK" ]]; then
     # fire-and-forget background
     nohup "${CMD[@]}" > "$LOG" 2>&1 &

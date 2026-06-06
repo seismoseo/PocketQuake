@@ -102,3 +102,35 @@ Re-execute the notebook directly to see the error:
 cd external/korea-cluster-relocation/pipeline/notebooks
 jupyter nbconvert --to notebook --execute --inplace 03_results_<slug>.ipynb
 ```
+
+## `Python relocation needs RELOCDD_PY_DIR in .env` (the `--python` path)
+
+The pure-Python relocation (`--python` / `--reloc-backend relocdd_py`) needs a clone of
+relocDD-py, pointed to by an env var:
+
+```bash
+git clone https://github.com/katie-biegel/relocDD-py.git
+echo "RELOCDD_PY_DIR=$PWD/relocDD-py" >> .env
+```
+
+## `--python`: EikoNet weights not found
+
+HypoSVI needs the pretrained EikoNet travel-time models. Fetch them once:
+
+```bash
+python -m pipeline.core.fetch_eikonet            # kim1983 + kim2011, P & S
+```
+
+They land under `pipeline/velocity_models/eikonet_<vm>/<vm>_{p,s}/` and the backend
+auto-discovers them (no `.env` editing). Train your own with
+`python -m pipeline.core.eikonet_train --vel-csv depth_km,vp_kms,vs_kms ...`.
+
+## `--python`: `No module named 'seaborn'` / `skfmm` / `sklearn`
+
+The HypoSVI + EikoNet clones import `seaborn`, `scikit-fmm` (`skfmm`), and `scikit-learn`
+(`sklearn`) at module load. They're in `environment.yml` as of v1.8.0; if your env predates
+that, install them into it:
+
+```bash
+pip install seaborn scikit-learn scikit-fmm
+```

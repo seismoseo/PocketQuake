@@ -116,6 +116,26 @@ Gwangyang-style mainshock treatment when you pass `--mainshock UTC_YYYYMMDDHHMMS
 **Default pipeline**: PhaseNet+ → HypoInverse → HypoDD → SKHASH focal mechanism.
 For a minimum-viable run without EQNet / SKHASH, see [docs/INSTALL.md §Minimum-viable](docs/INSTALL.md#minimum-viable-install-no-focal-mechanism-no-phasenet).
 
+**Fortran-free option (v1.8.0)**: run absolute location + relocation entirely in Python
+(HypoSVI + EikoNet, relocDD-py) — no `hyp1.40` / `ph2dt` / `hypoDD` build needed:
+
+```bash
+# one-time: clone the three Python tools (not on PyPI) and point .env at them
+git clone https://github.com/katie-biegel/relocDD-py.git && echo "RELOCDD_PY_DIR=$PWD/relocDD-py" >> .env
+git clone https://github.com/Ulvetanna/HypoSVI.git        && echo "HYPOSVI_DIR=$PWD/HypoSVI"       >> .env
+git clone https://github.com/Ulvetanna/EikoNet.git        && echo "EIKONET_DIR=$PWD/EikoNet"       >> .env
+python -m pipeline.core.fetch_eikonet              # one-time: pretrained kim1983 + kim2011 weights
+
+./pocketquake.sh examples/chungju/catalog.csv mytest --python
+./pocketquake.sh examples/chungju/catalog.csv mytest --compare   # ff vs pp side-by-side notebook
+```
+
+It is faithful to the Fortran chain — relative locations match `hypoDD` to ~1 m on identical
+input, with the same SVD→LSQR adaptive-damping solver and the same bootstrap 95% error bars
+(the absolute epicentre can differ, HypoSVI vs HypoInverse — that centroid offset is expected).
+The default Fortran path is unchanged. Full recipe (incl. training your own velocity model):
+[docs/python_backend/README.md](external/korea-cluster-relocation/docs/python_backend/README.md).
+
 External binaries (`hyp1.40`, `hypoDD`, `mseed2sac`, etc.) are not pip-installable — see
 [docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md) for build instructions per tool.
 Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).

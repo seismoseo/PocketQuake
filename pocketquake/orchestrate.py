@@ -147,6 +147,8 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 picker: str = "phasenet_plus",
                 dtct_isolv: int = 1,
                 wf_backend: str = "necis",
+                loc_backend: str = "hypoinverse",
+                reloc_backend: str = "hypodd",
                 stp_cutoff: str | None = None,
                 run_focal_mechanism: bool = True,
                 skip_download: bool = False,
@@ -181,6 +183,7 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         name=cluster, region=region, catalog_csv=catalog_csv,
         epicenter=tuple(epicenter), region_bounds=tuple(region_bounds),
         networks=tuple(networks), dtct_isolv=dtct_isolv, wf_backend=wf_backend,
+        loc_backend=loc_backend, reloc_backend=reloc_backend,
     )
 
     # 1. scaffold + register (idempotent)
@@ -198,6 +201,7 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
     print(f"[pocketquake] config.py changes:  names={info['names_changed']}  src_dirs={info['src_dirs_changed']}")
     print(f"[pocketquake] wf_backend:     {wf_backend}"
           + (f"  (stp_cutoff={stp_cutoff})" if wf_backend == "mixed" and stp_cutoff else ""))
+    print(f"[pocketquake] loc_backend:    {loc_backend}    reloc_backend:  {reloc_backend}")
 
     # 2. waveform download
     if not skip_download:
@@ -273,6 +277,12 @@ def main(argv: list[str] | None = None) -> None:
                     help="PhaseNet weights to use for picking")
     ap.add_argument("--dtct-isolv", type=int, default=1, choices=(1, 2),
                     help="HypoDD dt.ct inversion: 1=SVD (small clusters), 2=LSQR (large)")
+    ap.add_argument("--loc-backend", default="hypoinverse", choices=("hypoinverse", "hyposvi"),
+                    help="Absolute-location backend: hypoinverse (Fortran hyp1.40, default) | "
+                         "hyposvi (Python, needs a trained EikoNet via HYPOSVI_EIKONET_P/S)")
+    ap.add_argument("--reloc-backend", default="hypodd", choices=("hypodd", "relocdd_py"),
+                    help="Relative-relocation backend: hypodd (Fortran ph2dt+hypoDD, default) | "
+                         "relocdd_py (Python port, needs the clone via RELOCDD_PY_DIR)")
     ap.add_argument("--no-focal-mechanism", action="store_true", help="Skip the focal_mechanism stage")
     ap.add_argument("--skip-download", action="store_true",
                     help="Skip waveform download (waveforms already exist in the cluster dir)")
@@ -306,6 +316,8 @@ def main(argv: list[str] | None = None) -> None:
         picker=args.picker,
         dtct_isolv=args.dtct_isolv,
         wf_backend=args.wf_backend,
+        loc_backend=args.loc_backend,
+        reloc_backend=args.reloc_backend,
         stp_cutoff=args.stp_cutoff,
         run_focal_mechanism=not args.no_focal_mechanism,
         skip_download=args.skip_download,
