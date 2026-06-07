@@ -41,6 +41,10 @@ markdown_extensions:
   - pymdownx.highlight: {anchor_linenums: true}
   - pymdownx.tabbed: {alternate_style: true}
   - toc: {permalink: true}
+  # Render Material icon shortcodes (`:material-…:`) as SVG icons instead of literal text.
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 nav:
   - Home: index.md
