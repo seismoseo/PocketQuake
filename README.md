@@ -30,7 +30,7 @@ Year,Month,Day,Hour,Minute,Second,Latitude,Longitude,Magnitude,Depth
 2025,2,8,10,13,23,37.14,127.76,1.6,7
 ```
 
-PocketQuake scaffolds a cluster, downloads the event waveforms, runs the picking → HypoDD → focal-mechanism chain, and produces an executed `03_results_<cluster>.ipynb` with epicenter maps, depth sections, fault-frame sections, bootstrap error bars, and beachballs.
+PocketQuake scaffolds a cluster, downloads the event waveforms, runs the picking → HypoDD → focal-mechanism chain, and produces an executed `03_results_<cluster>.ipynb` with epicenter maps, depth sections, fault-frame sections, bootstrap error bars, and beachballs — plus a uniform, presentation-ready **beamer PDF run summary** at `runs/<cluster>/summary/<cluster>_summary.pdf`.
 
 ### Worked example: chungju (4 events, Feb 2025)
 

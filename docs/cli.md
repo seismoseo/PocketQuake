@@ -45,6 +45,16 @@ If 0 waveforms are found the run stops with a clear message (often the wrong `--
 
 The location stage always computes **both** kim1983 and kim2011; `--velmodel` selects which one drives the **relocation**, **focal mechanisms**, and the **results notebook**. It fully selects the model for the Fortran path; with `--python`, HypoSVI keeps its bundled EikoNet weights for location while relocation + notebook follow `--velmodel`.
 
+## Run summary (beamer PDF)
+
+Every `./pocketquake.sh` run ends by compiling a uniform **beamer PDF summary** of the cluster (the `report` stage), alongside the results notebook — written to `runs/<slug>/summary/<slug>_summary.pdf`. It contains a stats overview, relocated epicenters, depth sections, a focal-mechanism map, a best-quality beachball (polarities + S/P ratios), cumulative seismicity, and a time-lapse of the sequence (embedded as both a static frame and a real `\animategraphics` animation). It compiles with **tectonic** and is **failure-safe** — a missing tectonic just logs `report: SKIPPED`. Regenerate it on its own with:
+
+```bash
+python -m pipeline.cli.make_summary --cluster myswarm          # --no-animate to skip the GIF
+```
+
+See [Workflow → Step 6](workflow.md#step-6-beamer-pdf-run-summary) for the full slide list.
+
 ## Examples
 
 ```bash

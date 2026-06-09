@@ -79,7 +79,7 @@ python -m pipeline.cli.run_pipeline --cluster changnyeong --picker phasenet_plus
     --stage-from focal_mechanism --through focal_mechanism
 ```
 
-Stage order: `stations → waveforms → picking → hypoinverse → ph2dt → dtct → rereference → xcorr → dtcc → focal_mechanism`.
+Stage order: `stations → waveforms → picking → hypoinverse → ph2dt → dtct → rereference → xcorr → dtcc → focal_mechanism → report`.
 
 The `xcorr` stage defaults to the `cctorch_gpu_batched` backend — a GPU FFT cross-correlation that is bit-exact to the obspy CPU baseline and **auto-falls-back to obspy** when no usable CUDA GPU is present (so CPU-only runs are unaffected). Pick the kernel with `--xcorr-backend` / `cfg.xcorr_backend`.
 
@@ -115,6 +115,24 @@ Each stage's output goes under `external/korea-cluster-relocation/pipeline/runs/
 - **Fault sections** — `viz.fault_sections` (2×2 figure: map view, along/across strike, fault-plane along-dip).
 - **3-D plotly view** — `viz.plot_3d_plane` with the best-fit plane overlay.
 - **Polarity quality** — `viz.polarity_quality`, optionally `viz.polarity_vs_manual` (Gwangyang-only).
+
+## Step 6 — beamer PDF run summary
+
+The final `report` stage (`pipeline.reporting.make_run_summary`) compiles a uniform **beamer PDF** summary of the run from the products already on disk — a portable, presentation-ready companion to the notebook. PocketQuake runs it automatically after the notebook; you can also run it on its own:
+
+```bash
+python -m pipeline.cli.run_pipeline --cluster changnyeong --stage-from report --through report
+# or the standalone CLI
+python -m pipeline.cli.make_summary --cluster changnyeong          # --no-animate to skip the GIF
+```
+
+It writes everything **per cluster** under `pipeline/runs/<cluster>/summary/`:
+
+- `<cluster>_summary.pdf` — title + stats overview (events located / dt.cc-relocated, period, depth range for **both** HYPOINVERSE and dt.cc, magnitude range, median RMS/gap, focal-mechanism count by quality), then one slide each for the relocated epicenters, depth sections, the focal-mechanism map, a **best-quality beachball** (per-station first-motion polarities + S/P amplitude ratios), cumulative seismicity, and a **time-lapse** of the sequence.
+- the time-lapse is embedded **twice** — a static key frame (renders in every PDF viewer) and a real `\animategraphics` animation (plays in Acrobat / Okular / pdfpc; a basic viewer shows the first frame).
+- `<cluster>_summary.tex`, the `<cluster>_seismicity.gif`, and a `figs/` directory with the rendered PNGs.
+
+Compiled with **tectonic** (resolved from `$TECTONIC_BIN` → `tectonic` on `PATH`). The stage is **failure-safe**: a missing tectonic or a bad figure logs `report: SKIPPED` and never fails the scientific run.
 
 ## Caveats for the changnyeong test
 

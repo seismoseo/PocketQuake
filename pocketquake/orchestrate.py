@@ -275,6 +275,11 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         print("\n[pocketquake] generating + executing the results notebook")
         nb_path = build_results_nb.build(cluster, velmodel=velmodel)
         _execute_notebook(nb_path)
+        # 6. compile the standard beamer PDF run summary (a failure-safe tail stage, so a
+        # missing tectonic / bad figure logs "report: SKIPPED" and never fails the run).
+        print("\n[pocketquake] compiling the beamer PDF run summary")
+        _run_eqcycle_stage(cluster, stage_from="report", through="report",
+                           picker=picker, extra=["--fm-velmodel", velmodel])
     else:
         print("\n[pocketquake] --skip-pipeline set; skipping the results notebook too "
               "(it requires sum files the pipeline produces)")

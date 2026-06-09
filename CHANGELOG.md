@@ -3,6 +3,58 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.10.0 — 2026-06-09
+
+A uniform, presentation-ready **beamer PDF run summary** as a first-class workflow product,
+compiled automatically alongside the results notebook at the end of every run.
+
+**Added**
+- **`report` stage** (`pipeline.reporting.make_run_summary`) compiles a per-cluster beamer deck to
+  `runs/<cluster>/summary/<cluster>_summary.pdf`: a stats overview (events located /
+  dt.cc-relocated, period, depth range for **both** HYPOINVERSE and dt.cc, magnitude range, median
+  RMS/gap, focal-mechanism count by quality), relocated epicenters, depth sections, the
+  focal-mechanism map, a best-quality **beachball** (per-station first-motion polarities + S/P
+  amplitude ratios), cumulative seismicity, and a **time-lapse** of the sequence embedded both as a
+  static key frame and a real `\animategraphics` animation. Compiled with **tectonic**.
+- **`pipeline.cli.make_summary`** standalone CLI (`--no-animate` to skip the GIF).
+- The orchestrator runs `report` after the notebook, so `./pocketquake.sh` emits the summary
+  automatically. The stage is **failure-safe** — a missing tectonic / bad figure logs
+  `report: SKIPPED` and never fails the scientific run.
+
+## 1.9.1 — 2026-06-09
+
+**Added**
+- **dt.cc interpolation disk cache** (`runs/<cluster>/wf_interp_cache/`): the 100→1000 Hz Lanczos
+  trace interpolation that dominates xcorr prep is cached to disk (keyed by source mtime/size +
+  filter band), so re-runs skip it and recompute only new pairs — byte-identical results. Toggle
+  with `cfg.xcorr_interp_cache` (default on).
+
+## 1.9.0 — 2026-06-09
+
+A GPU dt.cc cross-correlation backend that fills the GPU across event-pairs — the new default,
+**bit-exact** to the obspy CPU baseline and **memory-safe by construction** (the previous cctorch
+GPU path always OOM'd).
+
+**Added**
+- **`cctorch_gpu_batched`** xcorr backend (`--xcorr-backend` / `cfg.xcorr_backend`): a single-process
+  PyTorch FFT executor with VRAM-aware batch sizing, a hard memory cap, OOM-retry-halving, and a CPU
+  fallback so a run always completes. ~3× faster at cluster scale; **auto-falls-back to `obspy`**
+  with no usable CUDA GPU, so CPU-only runs are unaffected.
+
+**Changed**
+- Default xcorr backend is now `cctorch_gpu_batched` (was `obspy`); the obspy CPU core is unchanged.
+
+## 1.8.2 — 2026-06-06
+
+**Added**
+- **`--velmodel {kim1983|kim2011}`** selects the model driving relocation, focal mechanisms, and the
+  results notebook (the location stage always computes both).
+
+## 1.8.1 — 2026-06-06
+
+**Changed**
+- Robustness fixes across the run wrapper, plus the CLI-options documentation.
+
 ## 1.8.0 — 2026-06-05
 
 A fully **Fortran-free** relocation path: HypoSVI + EikoNet for absolute location and

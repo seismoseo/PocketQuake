@@ -3,7 +3,7 @@
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
 !!! info inline end "Version"
-    **v1.9.1** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
+    **v1.10.0** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
 
 PocketQuake glues two projects into a single reproducible workflow for Korean earthquake sequences:
 
@@ -18,7 +18,7 @@ Year,Month,Day,Hour,Minute,Second,Latitude,Longitude,Magnitude,Depth
 2025,2,7,2,54,38,37.14,127.76,1.4,6
 ```
 
-…and one command scaffolds a cluster, downloads the waveforms, runs the chain, and produces an executed `03_results_<cluster>.ipynb` with epicenter maps, depth sections, fault-frame sections, bootstrap 95% error bars, and focal-mechanism beachballs:
+…and one command scaffolds a cluster, downloads the waveforms, runs the chain, and produces an executed `03_results_<cluster>.ipynb` with epicenter maps, depth sections, fault-frame sections, bootstrap 95% error bars, and focal-mechanism beachballs — plus a uniform, presentation-ready **beamer PDF run summary** (`runs/<cluster>/summary/<cluster>_summary.pdf`):
 
 ```bash
 ./pocketquake.sh examples/chungju/chungju_catalog.csv chungju --fg
