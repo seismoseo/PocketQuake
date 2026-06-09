@@ -1,2 +1,2 @@
 # Documentation site (MkDocs Material) — used by Read the Docs and local `mkdocs serve`.
-mkdocs-material>=9.5
+mkdocs-material>=9.5,<10   # pin off the breaking 2.0 "unsuitable for production" release
