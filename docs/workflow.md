@@ -81,6 +81,8 @@ python -m pipeline.cli.run_pipeline --cluster changnyeong --picker phasenet_plus
 
 Stage order: `stations → waveforms → picking → hypoinverse → ph2dt → dtct → rereference → xcorr → dtcc → focal_mechanism`.
 
+The `xcorr` stage defaults to the `cctorch_gpu_batched` backend — a GPU FFT cross-correlation that is bit-exact to the obspy CPU baseline and **auto-falls-back to obspy** when no usable CUDA GPU is present (so CPU-only runs are unaffected). Pick the kernel with `--xcorr-backend` / `cfg.xcorr_backend`.
+
 Each stage's output goes under `external/korea-cluster-relocation/pipeline/runs/changnyeong/`. Notable outputs:
 
 - `station_table/used_stations_100km.csv` — stations within 100 km of the epicenter that had usable data.

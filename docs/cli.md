@@ -23,6 +23,7 @@
 | `--picker {phasenet_plus\|stead}` | picker model (default `phasenet_plus`; `stead` needs no EQNet) |
 | `--velmodel {kim1983\|kim2011}` | velocity model for relocation + focal mechanisms + notebook (default `kim1983`) |
 | `--cores N` | cap xcorr workers (default per-cluster, ~10; lower it on small-RAM boxes) |
+| `--xcorr-backend {obspy\|cctorch_cpu\|cctorch_gpu\|cctorch_gpu_batched}` | dt.cc xcorr kernel (default `cctorch_gpu_batched`; overrides `cfg.xcorr_backend`) |
 | `--epi LAT,LON` | override the auto-derived epicenter (catalog centroid) |
 | `--bounds LAT0,LAT1,LON0,LON1` | override the auto-derived region (catalog bbox + 0.2°) |
 | `--fg` | run in the foreground (default: background via `nohup`, logs to `<slug>_run.log`) |
@@ -35,6 +36,10 @@ Skips **only** the download stage; everything downstream still runs (gather exis
 - `--source stp` / `mixed` → `stp_download/SAC/`
 
 If 0 waveforms are found the run stops with a clear message (often the wrong `--source` — pre-2020 data is STP-served).
+
+## dt.cc xcorr backend
+
+`--xcorr-backend` selects the dt.cc cross-correlation kernel (overriding `cfg.xcorr_backend`). The default `cctorch_gpu_batched` is a single-process GPU (PyTorch FFT) executor that batches across event-pairs: **bit-exact** to the obspy CPU baseline, memory-safe (VRAM-aware batch sizing + OOM-retry), and **~3× faster** at scale. Without a usable CUDA GPU it **auto-falls-back to `obspy`**, so CPU-only machines are unaffected. The GPU path needs the `pq-gpu` conda env (PyTorch cu128). Other values: `obspy` (CPU baseline), `cctorch_cpu` / `cctorch_gpu` (older per-pair PyTorch paths).
 
 ## Velocity model
 

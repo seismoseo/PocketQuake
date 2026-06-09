@@ -185,6 +185,14 @@ dt.ct/dt.cc), the **focal mechanisms**, and the **results notebook**:
 This fully selects the model for the Fortran path; with `--python`, HypoSVI keeps its bundled
 EikoNet weights for location while the relocation + notebook follow `--velmodel`.
 
+**dt.cc cross-correlation backend.** The xcorr stage now defaults to a GPU FFT backend
+(`cctorch_gpu_batched`) that batches across event-pairs — **bit-exact** to the obspy CPU baseline
+(Δshift = 0.000 ms, ΔCC = 0), memory-safe by construction (VRAM-aware batch sizing + OOM-retry), and
+**~3× faster** at scale (yeoncheon: ~12 min vs ~39 min). On a machine without a usable CUDA GPU it
+**auto-falls-back to obspy**, so CPU-only setups are unaffected. Override with `--xcorr-backend`
+(`obspy`, `cctorch_cpu`, `cctorch_gpu`, `cctorch_gpu_batched`); the GPU path needs the `pq-gpu`
+conda env (PyTorch cu128).
+
 ## Gallery — what the notebook actually shows
 
 These figures all come straight out of `03_results_chungju.ipynb` (no manual editing) — the full

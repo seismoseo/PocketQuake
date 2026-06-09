@@ -31,7 +31,7 @@
 }
 
 % Keep \pqversion in sync with pocketquake.__version__ (single source of truth).
-\newcommand{\pqversion}{1.8.2}
+\newcommand{\pqversion}{1.9.0}
 \title{PocketQuake}
 \subtitle{From a catalog CSV to a relocation notebook in one command}
 \author{Min-Seong Seo / SGTL, SNU}
@@ -197,6 +197,7 @@ Useful flags:
   \item \texttt{--picker stead} --- SeisBench PhaseNet (no EQNet needed)
   \item \texttt{--mainshock <UTC>} --- Gwangyang-style mainshock treatment
   \item \texttt{--cores N} --- cap xcorr workers (default 10)
+  \item \texttt{--xcorr-backend} --- dt.cc xcorr kernel (default \texttt{cctorch\_gpu\_batched}, a bit-exact GPU FFT backend that auto-falls-back to obspy without a GPU)
 \end{itemize}
 \end{frame}
 
