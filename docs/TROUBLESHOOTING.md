@@ -134,3 +134,40 @@ that, install them into it:
 ```bash
 pip install seaborn scikit-learn scikit-fmm
 ```
+
+## `GPU xcorr: UNAVAILABLE in this env → CPU fallback`
+
+You see this near the start of a run, or at the `xcorr` stage:
+
+```
+NVIDIA RTX PRO 6000 Blackwell ... CUDA capability sm_120 is not compatible with the current PyTorch installation.
+[xcorr] WARN: cctorch_gpu_batched requested but the GPU is unusable in THIS env (RuntimeError; torch 2.6.0+cu124 supports sm_80, sm_86, sm_90) -> obspy CPU fallback. Use the pq-gpu env (PyTorch cu128) for GPU xcorr.
+[xcorr] ... (backend=obspy ...)
+```
+
+**This is not an error** — the run completes correctly on the obspy CPU baseline. It means the
+**conda env you launched with has a PyTorch too old for your GPU**: the default GPU `xcorr` backend
+(`cctorch_gpu_batched`) probed the card, found torch can't drive it, and fell back to CPU. The
+classic case is a **Blackwell sm_120** GPU with a **cu124** wheel (supports only up to sm_90).
+
+**Whether the GPU is used is decided entirely by the launching env** — it is not random:
+
+- launch from an env whose torch supports your card (e.g. **`pq-gpu`**, cu128) → `GPU xcorr: ACTIVE`,
+- launch from any other env, or a machine with no GPU → CPU fallback.
+
+**Fix — launch from the GPU env:**
+
+```bash
+conda activate pq-gpu && ./pocketquake.sh <catalog> <slug> …
+# or, without activating:
+POCKETQUAKE_PYTHON=/path/to/pq-gpu/bin/python ./pocketquake.sh <catalog> <slug> …
+```
+
+Confirm the env can reach the card before a long run:
+
+```bash
+python -c "import torch; print('sm_120' in torch.cuda.get_arch_list(), torch.cuda.get_device_name(0))"
+```
+
+If that prints `True …`, the run will report `GPU xcorr: ACTIVE`. (Same env requirement applies to
+the `--python` / HypoSVI GPU locate — see [Installation → GPU](INSTALL.md#2-conda-environment-one-command).)

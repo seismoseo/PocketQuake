@@ -47,9 +47,10 @@ playwright install chromium      # one-time, ~200 MB
 `environment.yml` installs Python, obspy, seisbench, playwright, pytorch (CPU),
 plotly, jupyter, and `libarchive` (which provides `bsdtar`).
 
-**GPU is recommended** if you use the `--python` / HypoSVI backend — the per-event
-locate is ~10–20× faster (a 15k-event catalog is ~15 h on GPU vs ~1–2 weeks on CPU).
-After activating the env, install a CUDA PyTorch wheel matching your card from
+**GPU is recommended.** It accelerates **two** stages: the **default `dt.cc` cross-correlation**
+(`xcorr`, `cctorch_gpu_batched` backend — ~3× at cluster scale) **and** the `--python` / HypoSVI
+locate (~10–20× per event; a 15k-event catalog is ~15 h on GPU vs ~1–2 weeks on CPU). After
+activating the env, install a CUDA PyTorch wheel matching your card from
 <https://pytorch.org/get-started/locally/> (e.g. `cu128` for Blackwell sm_120):
 
 ```bash
@@ -57,9 +58,15 @@ pip install --upgrade --index-url https://download.pytorch.org/whl/cu128 torch
 python -c "import torch; print('sm_120' in torch.cuda.get_arch_list(), torch.cuda.get_device_name(0))"
 ```
 
-HypoSVI auto-detects the GPU and falls back to CPU, so this step is optional — the
-default Fortran path and CPU HypoSVI both run fine without it. See
-[Python backend → GPU](python-backend.md#gpu-recommended).
+This is **optional** — both GPU stages auto-fall-back to CPU (the default Fortran path and CPU
+HypoSVI run fine without it). But the GPU is used **only when the env you launch with has a torch
+that supports your card**: PocketQuake runs whatever `python3` it finds (or `$POCKETQUAKE_PYTHON`),
+so a GPU newer than that env's torch (e.g. **sm_120 on a cu124 wheel**) cleanly falls back to CPU.
+If you keep a separate GPU env, point the wrapper at it without activating:
+`POCKETQUAKE_PYTHON=/path/to/gpu-env/bin/python ./pocketquake.sh …`. Each run prints
+**`GPU xcorr: ACTIVE`** or **`GPU xcorr: UNAVAILABLE in this env → CPU fallback`** up front so you
+can tell at a glance. See [Python backend → GPU](python-backend.md#gpu-recommended) and
+[Troubleshooting → GPU not used](TROUBLESHOOTING.md#gpu-xcorr-unavailable-in-this-env-cpu-fallback).
 
 ## 3. External binaries (compiled)
 
