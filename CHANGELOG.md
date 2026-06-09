@@ -3,6 +3,22 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.10.1 — 2026-06-09
+
+**Fixed**
+- **relocDD-py bootstrap no longer recomputes a cached result.** The results-notebook bootstrap
+  cell re-ran all `N_BOOT` inversions on every run — overrunning the 3600 s per-cell timeout and
+  failing the `report`/notebook stage — because the cache match required `backend=relocdd_py` in the
+  errors-CSV header, which legacy (and Fortran-written) caches lack. The check now accepts a missing
+  backend tag as a legacy match, so a valid existing result is reused (a Yeongyang run went from a
+  >3600 s timeout to **1 m 18 s**).
+
+**Changed**
+- **Bootstrap parallelism fixed for many-core hosts.** Each replica subprocess is now pinned to a
+  single BLAS/OpenMP thread, and the worker pool is sized from new `ClusterConfig.bootstrap_cores`
+  (default **30**) instead of `num_cores` (10) — so cold-cache bootstraps use cores as a true count
+  rather than oversubscribing the machine (N workers × many BLAS threads each).
+
 ## 1.10.0 — 2026-06-09
 
 A uniform, presentation-ready **beamer PDF run summary** as a first-class workflow product,
