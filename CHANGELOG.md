@@ -3,6 +3,25 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.11.0 — 2026-06-10
+
+**Added**
+- **Per-cluster waveform-similarity figures in the results notebook + beamer report.** New results
+  section "3. Waveform similarity per dt.cc sub-cluster" (single-cluster runs are shown without a
+  sub-cluster index). For each dt.cc sub-cluster (hypoDD `cid`), at the **station nearest to (and
+  common to) the sub-cluster's events**:
+    - a **waveform gather** of every event's **full waveform (P + S + coda)**, P-aligned at t=0 (red)
+      with the **S pick as a blue bar**, ordered top→bottom = past→present (no stack), so a
+      near-repeating family reads as near-identical rows;
+    - a **waveform NCC matrix** over the same full window, shown both in **chronological** order
+      (shares the gather's order) and in **hierarchical-clustering** order (with dendrogram) so
+      repeating sub-families gather into bright blocks regardless of when they occurred.
+  Bandpass **5–20 Hz** (the dt.cc band). New `pipeline.analysis.similarity.{nearest_common_station,
+  cluster_events_by_cid, cluster_cc_matrix}` + `pipeline.viz.{plot_cluster_similarity_gather,
+  plot_cluster_cc_matrix}`. Sub-clusters whose era has no station recording every event relax to the
+  max-coverage station (warned, never aborts). Verified end-to-end on `west_jeju` (notebook 0 errors;
+  slides in the summary PDF).
+
 ## 1.10.2 — 2026-06-10
 
 **Fixed**

@@ -222,7 +222,31 @@ for _pf in _pfs:
     _eid = os.path.basename(_pf).split("_")[0]
     viz.plot_record_section(cfg, _eid); plt.show()""")
 
-md("""## 3. Focal mechanisms
+md("""## 3. Waveform similarity per dt.cc sub-cluster
+
+For each relocated sub-cluster (hypoDD `cid`; if the run is a single cluster it is shown without a
+sub-cluster index), views at the **station nearest to (and common to) the sub-cluster's events**, all
+at the dt.cc band (**5-20 Hz**, Z, **full P+S+coda window**):
+
+- **`plot_cluster_similarity_gather`** — each event's full waveform as an offset wiggle, P-aligned at
+  t=0 (red dashed) with the **S pick as a short blue bar**, ordered **top = earliest → bottom =
+  latest** (no stack), so a near-repeating family reads as near-identical rows;
+- **`plot_cluster_cc_matrix`** — the waveform NCC matrix computed over the full window, shown twice:
+  **chronological** (shares the gather's order — temporal sub-structure appears as diagonal blocks) and
+  **hierarchical clustering** order (with dendrogram — repeating sub-families gather into bright blocks
+  regardless of when they occurred).""")
+co(r"""# per dt.cc sub-cluster (cid): nearest common station, full P+S+coda window, 5-20 Hz, Z
+from pipeline.analysis import similarity as _simil
+_groups = _simil.cluster_events_by_cid(cfg, min_events=4)
+_single = len(_groups) == 1                       # single cid -> don't index the sub-cluster
+print(f"{len(_groups)} dt.cc sub-cluster(s) with >=4 events:",
+      {int(_c): len(_e) for _c, _e in _groups.items()})
+for _cid in _groups:
+    viz.plot_cluster_similarity_gather(cfg, cid=_cid, show_cid=not _single); plt.show()
+    viz.plot_cluster_cc_matrix(cfg, cid=_cid, order="chrono",  show_cid=not _single); plt.show()
+    viz.plot_cluster_cc_matrix(cfg, cid=_cid, order="cluster", show_cid=not _single); plt.show()""")
+
+md("""## 4. Focal mechanisms
 
 The table is one row per event (best quality kept) and lists **both nodal planes** —
 `strike/dip/rake` is the SKHASH-reported plane (NP1) and `strike2/dip2/rake2` its conjugate
@@ -269,7 +293,7 @@ else:
  else:
      print("No mechanisms to plot (needs a phasenet_plus focal_mechanism run).")""")
 
-md("""## 4. Seismicity in fault coordinates
+md("""## 5. Seismicity in fault coordinates
 
 `fault_sections` rotates the dt.cc relocated catalog into the fault frame and shows four panels:
 a **fault-plane map view** (with the strike line, the perpendicular, and the focal-mechanism beachball),
@@ -314,7 +338,7 @@ _anim = viz.animate_seismicity(cfg, VELMODEL, frame_from=FRAME_FROM, mech_select
                                 return_html=True)
 _anim    # inline HTML5 player; the GIF also sits at <output_root>/<cluster>_seismicity.gif""")
 
-md("""## 5. Seismicity in 3-D (interactive)
+md("""## 6. Seismicity in 3-D (interactive)
 
 `plot_3d_plane` returns an **interactive plotly** 3-D view of the dt.cc hypocentres (relative E–N–depth km,
 coloured by origin time, sized by magnitude) with the SVD best-fit fault plane overlaid as a translucent
@@ -337,7 +361,7 @@ except Exception:
     pass
 fig3d_e""")
 
-md("""## 6. PhaseNet+ polarity quality — are the first motions trustworthy?
+md("""## 7. PhaseNet+ polarity quality — are the first motions trustworthy?
 
 The focal mechanisms rest on PhaseNet+ first-motion **polarities**, so it's worth asking how good they are.
 `polarity_quality` shows the polarity **confidence** (`|polarity|`) and pick-probability distributions, plus
@@ -357,7 +381,7 @@ mechanisms when confidence-gated** (the pipeline already gates on `fm_min_pick_p
 wholesale substitute for expert manual polarity picking**, especially for sparse / low-SNR events; the
 low-confidence picks should be down-weighted or excluded, not trusted blindly.""")
 
-md(r"""## 7. Interpretation
+md(r"""## 8. Interpretation
 
 - **Quality A/B** = well-constrained ("fairly high confidence"); C/D are under-constrained and shown
   for context only. SKHASH grades on polarity misfit, station-distribution ratio, azimuthal/takeoff
