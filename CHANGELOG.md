@@ -3,6 +3,19 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.10.2 — 2026-06-10
+
+**Fixed**
+- **A valid run no longer crashes when a cluster has 0 focal mechanisms.** A small cluster can locate
+  events but yield no mechanisms (too few first-motion polarities for SKHASH), leaving a header-only
+  `mechanisms.csv`. The results notebook's `_FM_OK` guard only checks that the file *exists*, so
+  `viz.map_mechanisms` ran on an empty table — the centroid `mean()` of an empty frame is `NaN`, and
+  `set_xlim(NaN)` raised *“Axis limits cannot be NaN or Inf”*, which propagated out of the
+  results-notebook stage and **aborted the whole run before the beamer `report` stage** (so no summary
+  PDF was produced). `map_mechanisms` now returns a labelled placeholder when the mechanism table is
+  empty. Verified on a 10-event / 0-mechanism cluster (`west_jeju`): the results notebook executes
+  with 0 errors and the beamer summary compiles.
+
 ## 1.10.1 — 2026-06-09
 
 **Fixed**

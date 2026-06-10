@@ -103,6 +103,13 @@ cd external/korea-cluster-relocation/pipeline/notebooks
 jupyter nbconvert --to notebook --execute --inplace 03_results_<slug>.ipynb
 ```
 
+A small cluster can locate events but produce **0 focal mechanisms** (too few first-motion
+polarities for SKHASH), leaving a header-only `mechanisms.csv`. As of **1.10.2** this is handled —
+the mechanism map renders a "no focal mechanisms" placeholder instead of crashing, and the run
+reaches the beamer `report` stage normally. On older versions this raised *"Axis limits cannot be
+NaN or Inf"* in the mechanism cell and aborted the run before the summary PDF; upgrade, or just
+re-run the cluster.
+
 ## `Python relocation needs RELOCDD_PY_DIR in .env` (the `--python` path)
 
 The pure-Python relocation (`--python` / `--reloc-backend relocdd_py`) needs a clone of
