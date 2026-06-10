@@ -3,6 +3,14 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.11.1 — 2026-06-10
+
+**Docs**
+- Document the **waveform-similarity** results (1.11.0 feature) in the beamer tutorial — new
+  *"Output 4 — Waveform similarity"* slide showing the full-waveform gather + the Z CC matrix
+  (chronological + hierarchical) — and in the mkdocs **Workflow** page (Step 5 results notebook and
+  Step 6 beamer run-summary now list the gather + CC matrices). Tutorial PDF recompiled.
+
 ## 1.11.0 — 2026-06-10
 
 **Added**

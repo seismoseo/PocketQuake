@@ -111,6 +111,7 @@ Each stage's output goes under `external/korea-cluster-relocation/pipeline/runs/
 
 - **Locations** — `.sum` and dt.cc relocation maps, depth sections, cumulative/rate, network growth.
 - **Picks + first-motion polarity** — `viz.plot_3c` (P/S marks + polarity arrow on the vertical) and `viz.plot_polarities` (P-aligned record section sorted by azimuth).
+- **Waveform similarity (per dt.cc sub-cluster)** — at the station nearest to and common to each sub-cluster's events: `viz.plot_cluster_similarity_gather` (full-waveform P+S+coda gather, P-aligned, S pick marked, window auto-sized from hypocentral distance, past→present, no stack) + `viz.plot_cluster_cc_matrix` (Z waveform cross-correlation matrix, 5–20 Hz, in **chronological** and **hierarchical-clustering** order with a dendrogram). Single-cluster runs are shown without a sub-cluster index.
 - **Focal mechanisms** — `viz.map_mechanisms` (beachballs on a ring around the cluster) + `viz.mechanism_table` (both nodal planes + auxiliary plane).
 - **Fault sections** — `viz.fault_sections` (2×2 figure: map view, along/across strike, fault-plane along-dip).
 - **3-D plotly view** — `viz.plot_3d_plane` with the best-fit plane overlay.
@@ -128,7 +129,7 @@ python -m pipeline.cli.make_summary --cluster changnyeong          # --no-animat
 
 It writes everything **per cluster** under `pipeline/runs/<cluster>/summary/`:
 
-- `<cluster>_summary.pdf` — title + stats overview (events located / dt.cc-relocated, period, depth range for **both** HYPOINVERSE and dt.cc, magnitude range, median RMS/gap, focal-mechanism count by quality), then one slide each for the relocated epicenters, depth sections, the focal-mechanism map, a **best-quality beachball** (per-station first-motion polarities + S/P amplitude ratios), cumulative seismicity, and a **time-lapse** of the sequence.
+- `<cluster>_summary.pdf` — title + stats overview (events located / dt.cc-relocated, period, depth range for **both** HYPOINVERSE and dt.cc, magnitude range, median RMS/gap, focal-mechanism count by quality), then one slide each for the relocated epicenters, depth sections, the focal-mechanism map, a **best-quality beachball** (per-station first-motion polarities + S/P amplitude ratios), cumulative seismicity, the **waveform-similarity gather + CC matrices** (chronological + hierarchical) for the largest sub-cluster, and a **time-lapse** of the sequence.
 - the time-lapse is embedded **twice** — a static key frame (renders in every PDF viewer) and a real `\animategraphics` animation (plays in Acrobat / Okular / pdfpc; a basic viewer shows the first frame).
 - `<cluster>_summary.tex`, the `<cluster>_seismicity.gif`, and a `figs/` directory with the rendered PNGs.
 

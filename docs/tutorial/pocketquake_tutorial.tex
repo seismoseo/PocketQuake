@@ -31,7 +31,7 @@
 }
 
 % Keep \pqversion in sync with pocketquake.__version__ (single source of truth).
-\newcommand{\pqversion}{1.11.0}
+\newcommand{\pqversion}{1.11.1}
 \title{PocketQuake}
 \subtitle{From a catalog CSV to a relocation notebook in one command}
 \author{Min-Seong Seo / SGTL, SNU}
@@ -292,6 +292,23 @@ $\sim$1\,km scatter (KMA bulletin) to $\sim$200\,m.
 The notebook bundles a per-event beachball gallery (left) and a record-section
 view of the M3.1 mainshock with PhaseNet+ pick markers, first-motion polarities,
 and the SKHASH-inferred S/P amplitude ratios (right).
+\end{frame}
+
+% ----------------------------------------------------------------- output 4
+\begin{frame}{Output 4 --- Waveform similarity (per dt.cc sub-cluster)}
+\begin{columns}[T,onlytextwidth]
+\column{0.52\textwidth}
+\includegraphics[width=\textwidth]{figures/07_wf_similarity_gather.png}
+\column{0.46\textwidth}
+\includegraphics[width=\textwidth]{figures/07_wf_similarity_ccmatrix.png}
+\end{columns}
+\vspace{0.4em}
+\scriptsize
+For each relocated sub-cluster (hypoDD \texttt{cid}), at the station \emph{nearest to and common to}
+its events: a \textbf{full-waveform (P+S+coda) gather}, P-aligned at $t{=}0$ (window auto-sized from
+the hypocentral distance), S pick in blue, past$\to$present, no stack (left); and the \textbf{Z waveform
+cross-correlation matrix} (5--20\,Hz) in chronological and \textbf{hierarchical-clustering} order with a
+dendrogram (right). A near-repeating family reads as near-identical traces / a uniformly bright block.
 \end{frame}
 
 % ----------------------------------------------------------------- run own
