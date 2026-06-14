@@ -3,6 +3,31 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.12.0 — 2026-06-14
+
+**Added**
+- **Automatic anti-aliasing before PhaseNet+ down-sampling.** PhaseNet+ runs at 100 Hz, but the
+  underlying EQNet reader down-sampled higher-rate stations (200 Hz KMA/KG, 250 Hz nodal/geophone
+  arrays) with plain **linear interpolation and no anti-alias lowpass**, folding >50 Hz energy back
+  onto the P/S onsets — distorting pick times and first-motion polarity. PocketQuake now inserts a
+  proper guard before the picker: demean → taper → **zero-phase** Butterworth lowpass at 45 Hz
+  (0.9 × the new 50 Hz Nyquist) → resample (`eqnet_backend._antialias_resample`, applied in
+  `_sac_to_mseed`). Fires **only when the native rate exceeds 100 Hz**: 100 Hz archive data passes
+  through **byte-identical** and up-sampling (e.g. 40 Hz → 100 Hz) is alias-free and untouched.
+  Zero-phase keeps onset times in place (a causal lowpass would bias picks late). Verified on a real
+  200 Hz KG trace: energy above 45 Hz drops 0.064% → 0.003%. Largest benefit for close, high-corner
+  sources on dense high-rate deployments.
+
+**Engine (`korea-cluster-relocation`)**
+- `eqnet_backend`: the anti-alias guard above.
+- `write_phs`: lift the 999-event cuspid cap (`cuspid_offset + idx`, byte-identical for `idx ≤ 999`).
+- `viz.fault_sections`: optional `source_radius` to draw events as to-scale source-circle markers;
+  magnitude legend + "Local magnitude" axis in the fault-frame map view; inset A/A′/B/B′ section-end labels.
+
+**Docs**
+- New anti-aliasing coverage in the **Workflow** page, **Troubleshooting** (high-rate stations), and a
+  dedicated **beamer tutorial** slide ("High-rate stations: automatic anti-aliasing"). Tutorial PDF recompiled.
+
 ## 1.11.1 — 2026-06-10
 
 **Docs**

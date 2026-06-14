@@ -16,7 +16,7 @@ Workflow (see `pocketquake.orchestrate.orchestrate`):
         → build & execute `03_results_<cluster>.ipynb`
 """
 
-__version__ = "1.11.1"            # single source of truth — pyproject.toml reads this via setuptools dynamic
+__version__ = "1.12.0"            # single source of truth — pyproject.toml reads this via setuptools dynamic
 
 import os
 

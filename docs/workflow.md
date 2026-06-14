@@ -83,6 +83,9 @@ Stage order: `stations → waveforms → picking → hypoinverse → ph2dt → d
 
 The `xcorr` stage defaults to the `cctorch_gpu_batched` backend — a GPU FFT cross-correlation that is bit-exact to the obspy CPU baseline and **auto-falls-back to obspy** when no usable CUDA GPU is present (so CPU-only runs are unaffected). Pick the kernel with `--xcorr-backend` / `cfg.xcorr_backend`.
 
+!!! note "Automatic anti-aliasing at the `picking` stage (v1.12.0)"
+    PhaseNet+ runs at 100 Hz. For stations recorded **above** 100 Hz (e.g. 200 Hz KMA/KG stations, or 250 Hz nodal/geophone arrays), PocketQuake now applies a proper anti-alias lowpass — demean → taper → **zero-phase** Butterworth lowpass at 45 Hz (0.9 × the new 50 Hz Nyquist) → resample — **before** the trace reaches the picker. Without it, the underlying EQNet reader down-samples with plain linear interpolation and no lowpass, folding any >50 Hz energy back onto the P/S onsets (aliasing), which distorts pick times and first-motion polarity. The guard fires **only when the native rate exceeds 100 Hz**: 100 Hz archive data passes through byte-identical, and up-sampling (e.g. 40 Hz → 100 Hz) is alias-free and untouched. Zero-phase filtering keeps onset times in place — a causal lowpass would bias picks late. See `pipeline.core.eqnet_backend` (`_antialias_resample`).
+
 Each stage's output goes under `external/korea-cluster-relocation/pipeline/runs/changnyeong/`. Notable outputs:
 
 - `station_table/used_stations_100km.csv` — stations within 100 km of the epicenter that had usable data.

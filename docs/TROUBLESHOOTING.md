@@ -178,3 +178,21 @@ python -c "import torch; print('sm_120' in torch.cuda.get_arch_list(), torch.cud
 
 If that prints `True …`, the run will report `GPU xcorr: ACTIVE`. (Same env requirement applies to
 the `--python` / HypoSVI GPU locate — see [Installation → GPU](INSTALL.md#2-conda-environment-one-command).)
+
+## Stations recorded above 100 Hz (200/250 Hz) — aliasing on the picks?
+
+**No action needed — PocketQuake handles it automatically (since v1.12.0).** PhaseNet+ runs at
+100 Hz, so any station recorded above that (200 Hz KMA/KG stations, 250 Hz nodal/geophone arrays)
+must be down-sampled first. The underlying EQNet reader does that with plain **linear interpolation
+and no anti-alias lowpass**, which would fold >50 Hz energy back onto the P/S onsets and distort pick
+times and first-motion polarity. PocketQuake inserts a proper anti-alias guard before the picker
+(demean → taper → **zero-phase** 45 Hz lowpass → resample), so:
+
+- stations **> 100 Hz** are correctly anti-aliased before picking;
+- **100 Hz** archive data passes through **byte-identical** (the guard is a no-op);
+- **up-sampling** (e.g. 40 Hz → 100 Hz) is already alias-free and untouched.
+
+This is automatic in both the per-event picker (`eqnet_backend._antialias_resample`) and, in the
+continuous-detection pipelines, the `AntialiasSeismicTraceDataset` reader. The practical impact is
+largest for **close, high-corner sources on high-rate stations** (dense temporary deployments); for
+distant regional events on broadband channels the >50 Hz energy is usually small either way.
