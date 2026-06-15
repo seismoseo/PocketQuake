@@ -3,6 +3,22 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.12.1 — 2026-06-16
+
+**Fixed**
+- **Beachball polarity overlay used the wrong take-off convention.** `viz._lower_hemisphere_xy`
+  assumed take-off measured from the downward vertical (0 = down), but SKHASH writes **HASH
+  notation** (`flip_takeoff=False` default): **0 = upgoing, 180 = downgoing**. The antipodal
+  flip was applied to the wrong rays, **point-reflecting every first-motion triangle and S/P
+  circle through the beachball centre** — markers landed in the wrong quadrants for steep
+  (near-source) rays. Fixed to the real HASH convention (downgoing = take-off > 90 plotted
+  directly; upgoing < 90 mapped antipodally) plus the matching station-label azimuth. Verified:
+  markers now fall in the correct quadrant at **100%** of take-off angles (was 46–97%), and the
+  `polarity_misfit = 0` reference event renders 14/14 clean. **Visualization-only** — SKHASH
+  mechanisms, `polarity_misfit`, and A–D quality grades are computed internally and were never
+  affected; previously-rendered overlays were misleading but the underlying science is unchanged.
+  (engine: `korea-cluster-relocation` `viz.py`.)
+
 ## 1.12.0 — 2026-06-14
 
 **Added**
