@@ -138,6 +138,87 @@ It writes everything **per cluster** under `pipeline/runs/<cluster>/summary/`:
 
 Compiled with **tectonic** (resolved from `$TECTONIC_BIN` → `tectonic` on `PATH`). The stage is **failure-safe**: a missing tectonic or a bad figure logs `report: SKIPPED` and never fails the scientific run.
 
+## Augmenting an existing cluster
+
+When a sequence keeps producing events after a cluster has been processed, you don't have to
+re-run everything: give PocketQuake the **augmented catalog** (the old events plus the new
+ones) and pass `--augment`:
+
+```bash
+./pocketquake.sh my_catalog_updated.csv myswarm --augment --dry-run   # preview the diff
+./pocketquake.sh my_catalog_updated.csv myswarm --augment             # do it
+```
+
+Only the **new** events are downloaded, gathered, picked, and located; every existing
+per-event artifact is reused; then the whole-cluster (and cheap) stages re-run so the final
+`hypoDD.reloc`, focal mechanisms, notebook, and PDF cover the full augmented cluster.
+
+What happens, in order (`pocketquake/augment.py::augment_cluster`):
+
+1. **Preflight** — the cluster module, `runs/<slug>/` waveform dirs, the `.sum`, and every
+   existing event's picks CSV must exist (i.e. a completed prior run).
+2. **Diff** — new-catalog event ids (UTC `YYYYMMDDHHMMSS`, KST−9 h — the pipeline's own
+   loader) vs the processed waveform dirs. Events in the run but **missing from the new
+   catalog abort the augment** (strictly additive; removing events is a fresh-run decision).
+   Metadata revisions to existing events are warned about but not applied.
+3. **Pin event identity** — `runs/<slug>/event_manifest.csv` is written
+   (`evmap.pin_manifest`): existing events keep their current HypoDD cuspids byte-identically
+   (legacy sorted-dir enumeration frozen), new events append after. Without this, an event
+   that sorts between existing ones would renumber every later cuspid and silently corrupt
+   the cached dt.cc pair files (their content embeds cuspids).
+4. **Merge the catalog** — the cluster's `event_catalog.csv` is backed up
+   (`.pre_augment_<timestamp>`) and rewritten as old rows + new rows, time-sorted.
+5. **Download new events only** — honoring the cluster's stored waveform source
+   (NECIS / STP / mixed), with the per-event skip-if-exists making retries idempotent.
+   An event not yet served (e.g. NECIS's processing delay for very recent events) is simply
+   skipped this round — re-running the same `--augment` later retries exactly those.
+6. **Gather + pick new events only** (`--events` subsets) — existing SACs and picks are
+   never touched (re-picking already-rereferenced SACs degrades close-station P picks).
+7. **Whole-cluster HYPOINVERSE + dt.ct** — hyp1.40 locates each event independently, so
+   existing solutions reproduce; this is **verified** against a pre-augment snapshot.
+   An existing event whose **origin time** moved beyond 5 ms gets its cached dt.cc pairs
+   deleted and recomputed (dt.cc values reference the two origin times; even a
+   one-print-quantum 10 ms flip is 10× the 1 ms xcorr slide resolution). Position-only
+   moves (> 1e-4° epicenter / 0.05 km depth) are logged but do **not** invalidate —
+   dt.cc does not depend on epicenter/depth (those live in `event.dat`, rebuilt every run).
+8. **rereference + xcorr + dt.cc** — `rereference` skips SACs already at the `.sum` origin
+   (2 ms tolerance), preserving mtimes so the xcorr interp cache stays hot; `xcorr` runs with
+   `--xcorr-resume`, computing only new-vs-all + new-vs-new pairs (N existing + M new →
+   `M·N + C(M,2)` instead of `C(N+M,2)`). Stale bootstrap error caches are cleared (their
+   provenance header now also records the event set as `nev=`/`evhash=`).
+9. **Focal mechanisms, results notebook, PDF report** — re-run over the full cluster.
+
+The run ends with a reuse summary, e.g.:
+
+```
+[augment] === myswarm augmentation summary ===
+  events:      20 reused + 21 added = 41
+  picks:       20 reused (never re-picked)
+  xcorr pairs: 190 reused + 630 computed = 820 (full set C(41,2) = 820)
+  kim1983 .sum:  existing rows reproduced 20/20
+```
+
+`--augment` is incompatible with `--epi`/`--bounds`/`--source`/`--loc-backend`/
+`--reloc-backend`/`--python`/`--compare`/`--mainshock*`/`--skip-pipeline` — it reuses the
+cluster's stored config. `--picker`, `--velmodel`, `--cores`, `--skip-download`, and `--fg`
+work as usual. The log goes to `<slug>_augment.log`.
+
+### Manually-downloaded NECIS ZIPs
+
+If some events can't be fetched automatically (NECIS serves very recent events with a
+delay), download them from the NECIS event-search UI as one bulk "cart" ZIP and stage it:
+
+```bash
+python -m pocketquake.necis_zip 422892_xxx.zip --cluster myswarm --dry-run  # inspect mapping
+python -m pocketquake.necis_zip 422892_xxx.zip --cluster myswarm            # stage
+./pocketquake.sh my_catalog_updated.csv myswarm --augment --skip-download   # finish
+```
+
+Events are identified from their origin-stamped miniSEED member names and matched against
+the cluster catalog; already-staged events, missing data types, and out-of-catalog events
+are handled per archive. The miniSEED is converted to band-sorted SAC (mseed2sac) into the
+exact `kma_waveforms/<event_id>/<NECIS_ID>.{a,v}/` layout the pipeline expects.
+
 ## Caveats for the changnyeong test
 
 - The catalog has only **3 events** of M ≤ 2.6 on the same day. The `dt.cc` relative-relocation needs ≥ 2 well-correlating events; it will execute but produce a very small reloc set.

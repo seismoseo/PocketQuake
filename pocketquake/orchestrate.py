@@ -67,6 +67,32 @@ def _execute_notebook(path: str, timeout: int = 3600) -> None:
           f"--ExecutePreprocessor.timeout={timeout}", path])
 
 
+def _precompute_bootstraps(cluster: str) -> None:
+    """Compute the notebook's 1000-replica location-uncertainty bootstraps (dt.ct + dt.cc)
+    BEFORE executing the notebook, where no nbconvert per-cell timeout applies.
+
+    The notebook's bootstrap cells then load the cached bootstrap_errors.csv instantly.
+    Without this, a large cluster (or a loaded shared box) can push a 2x1000-replica
+    in-cell bootstrap past nbconvert's 3600 s per-cell timeout and fail the whole run
+    (observed: 41-event SVD replicas at ~2.5 min each under load). Failure-safe: on any
+    error here the notebook simply computes in-cell as before."""
+    import time
+    from pocketquake.build_results_nb import N_BOOT, BOOT_SEED
+    try:
+        cfg = _load_cluster_cfg(cluster)
+        if getattr(cfg, "reloc_backend", "hypodd") == "relocdd_py":
+            from pipeline.core import relocdd_py_backend as _backend
+        else:
+            from pipeline.core import hypodd as _backend
+        for br in ("dtct", "dtcc"):
+            t0 = time.time()
+            _backend.bootstrap_relocation(cfg, branch=br, n=N_BOOT, seed=BOOT_SEED)
+            print(f"[pocketquake] bootstrap[{br}]: cached for the notebook "
+                  f"({time.time() - t0:.0f}s)", flush=True)
+    except Exception as e:  # noqa: BLE001 — the notebook can still compute in-cell
+        print(f"[pocketquake] bootstrap precompute skipped ({type(e).__name__}: {e})")
+
+
 def _located_count(cluster: str) -> int:
     """Events located across the cluster's HYPOINVERSE/HypoSVI `.sum` files (header-only = 0).
     Used to bail clearly when nothing was located rather than crash downstream."""
@@ -272,6 +298,8 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
     # reads the sum files the pipeline produces; skipping the pipeline + executing the
     # notebook is guaranteed to FileNotFoundError on Yeongyang.sum / etc.)
     if not skip_pipeline:
+        print("\n[pocketquake] precomputing the bootstrap error bars (outside the notebook)")
+        _precompute_bootstraps(cluster)
         print("\n[pocketquake] generating + executing the results notebook")
         nb_path = build_results_nb.build(cluster, velmodel=velmodel)
         _execute_notebook(nb_path)
@@ -302,11 +330,21 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("catalog", help="Event catalog CSV (KMA columns: Year,Month,Day,Hour,Minute,Second,Latitude,Longitude,Magnitude,Depth — KST)")
     ap.add_argument("--cluster", required=True, help="Cluster slug (lowercase, no spaces), e.g. changnyeong")
     ap.add_argument("--region", default=None, help="Display name (default: cluster.capitalize())")
-    ap.add_argument("--epicenter", required=True, type=lambda s: _parse_pair(s, 2, "--epicenter"),
-                    help="Cluster centroid as 'lat,lon' (e.g. 35.463,128.427)")
-    ap.add_argument("--region-bounds", required=True,
+    ap.add_argument("--epicenter", default=None, type=lambda s: _parse_pair(s, 2, "--epicenter"),
+                    help="Cluster centroid as 'lat,lon' (e.g. 35.463,128.427). "
+                         "Required except with --augment (the existing cluster module has it).")
+    ap.add_argument("--region-bounds", default=None,
                     type=lambda s: _parse_pair(s, 4, "--region-bounds"),
-                    help="Box as 'lat0,lat1,lon0,lon1' (e.g. 35.3,35.65,128.25,128.65)")
+                    help="Box as 'lat0,lat1,lon0,lon1' (e.g. 35.3,35.65,128.25,128.65). "
+                         "Required except with --augment.")
+    ap.add_argument("--augment", action="store_true",
+                    help="Incremental mode: the catalog is an AUGMENTED version of an "
+                         "already-processed cluster's catalog. Downloads/picks/locates only "
+                         "the new events, reuses existing picks + dt.cc pairs, and re-runs "
+                         "the whole-cluster relocation (strictly additive — aborts if the "
+                         "catalog is missing events that exist in the run)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="With --augment: print the catalog diff (new/missing events) and exit")
     ap.add_argument("--networks", default=None,
                     help="Comma-separated station networks to bundle. "
                          "Default depends on --wf-backend: NECIS → 'KS' (only network NECIS bundles); "
@@ -348,6 +386,29 @@ def main(argv: list[str] | None = None) -> None:
                          "--arc-velmodel), focal mechanisms, and the results notebook. The "
                          "location stage still computes all cfg.velocity_models. Default kim1983.")
     args = ap.parse_args(argv)
+
+    if args.augment:
+        # Incremental mode: reuse the existing cluster's config/scaffold; only the new
+        # events are downloaded/picked, then the whole cluster is re-relocated.
+        bad = [f for f, v in (("--skip-pipeline", args.skip_pipeline),
+                              ("--epicenter", args.epicenter),
+                              ("--region-bounds", args.region_bounds)) if v]
+        if bad:
+            ap.error(f"--augment reuses the existing cluster config; drop {', '.join(bad)}")
+        from pocketquake import augment
+        augment.augment_cluster(
+            catalog_csv=args.catalog,
+            cluster=args.cluster,
+            picker=args.picker,
+            velmodel=args.velmodel,
+            cores=args.cores,
+            run_focal_mechanism=not args.no_focal_mechanism,
+            skip_download=args.skip_download,
+            dry_run=args.dry_run,
+        )
+        return
+    if args.epicenter is None or args.region_bounds is None:
+        ap.error("--epicenter and --region-bounds are required (except with --augment)")
 
     orchestrate(
         catalog_csv=args.catalog,

@@ -3,6 +3,87 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.13.0 — 2026-08-18
+
+**Added**
+- **Incremental cluster augmentation (`--augment`).** Given an augmented catalog for an
+  already-processed cluster (`./pocketquake.sh NEW_CATALOG SLUG --augment`), PocketQuake now
+  adds only the NEW events — download → gather → pick → locate — and re-relocates the whole
+  cluster, instead of redoing everything from scratch. Reuse guarantees:
+  - **Event identity is pinned** by a `runs/<cluster>/event_manifest.csv`
+    (`evmap.pin_manifest`): existing events keep their current HypoDD cuspids byte-identically
+    and new events append after, so cached `.sum`/`event.dat`/`dt.ct`/`dt.cc` content stays
+    valid even for events that interleave in time with the existing ones.
+  - **Existing events are never re-gathered or re-picked** (per-event `--events` subsets);
+    their picks CSVs and SAC pick headers are untouched.
+  - **HYPOINVERSE re-runs whole-cluster** (hyp1.40 locates each event independently, so
+    existing solutions reproduce) and that is **verified** against a pre-augment snapshot.
+    An existing event whose **origin time** moved beyond 5 ms has its cached dt.cc pairs
+    invalidated and recomputed (`xcorr.invalidate_pairs`) — dt.cc values reference the two
+    origin times, and a one-print-quantum 10 ms flip is 10× the 1 ms xcorr slide resolution.
+    Position-only moves (> 1e-4° / 0.05 km) are logged but do NOT invalidate: dt.cc does not
+    depend on epicenter/depth (those live in event.dat, rebuilt every run).
+  - **Events the waveform source can't serve yet are handled gracefully**: they are skipped
+    with a warning and the run proceeds with the available subset; re-running the same
+    `--augment` later retries exactly the pending events (they still diff as "new").
+  - **xcorr reuses every existing pair**: the per-pair resume (`XCORR_RESUME`) is promoted to
+    a first-class `--xcorr-resume` CLI flag / `run_cluster(xcorr_resume=)` parameter; only
+    new-vs-all + new-vs-new pairs are computed (N existing + M new → `M·N + C(M,2)` instead
+    of `C(N+M,2)` pairs).
+  - **`rereference` now skips SACs already at the `.sum` origin** (2 ms tolerance — nzmsec
+    quantizes at 1 ms, genuine `.sum` origin changes at 10 ms), preserving mtimes so the
+    xcorr interp disk cache and cached dt.cc pairs stay valid; a repeat run with the same
+    velmodel is now a true no-op.
+  - **dt.ct/dt.cc HypoDD, focal mechanisms, the results notebook and the PDF report re-run**
+    over the full augmented cluster (they are cheap). Stale bootstrap error caches are
+    cleared, and the bootstrap provenance header now records the event set
+    (`nev=`/`evhash=`) so a changed cluster auto-invalidates old caches.
+  - **Strictly additive policy**: if the new catalog is missing events that exist in the run,
+    the augment aborts listing them (removing events is a deliberate fresh-run decision).
+    Catalog metadata revisions for existing events are warned about but NOT applied (the
+    original rows are kept, guarding location reproducibility). The pre-augment catalog is
+    backed up as `event_catalog.csv.pre_augment_<timestamp>`.
+  - `--dry-run` prints the catalog diff (new / missing events) and exits without changes.
+- **NECIS bulk-ZIP staging utility (`python -m pocketquake.necis_zip`).** Stages a
+  manually-downloaded NECIS "cart" ZIP (per-event `<NECIS_ID>.{a,v}.zip` archives of flat
+  miniSEED) into a cluster's `kma_waveforms/` tree. Events are identified by their
+  origin-stamped miniSEED member names (`KS.ADOA.BGE.2026.227.19.58.07` → event_id) and
+  matched against the cluster catalog — already-staged and out-of-catalog events are
+  skipped, per data type (a partial event, e.g. `a` present but `v` failed, is topped up).
+  miniSEED is converted to band-sorted SAC with the NECIS downloader's own converter.
+  Pairs naturally with augmentation: stage the ZIP, then `--augment --skip-download`.
+
+**Fixed**
+- **Bootstrap per-replica timeout now scales to measured machine speed** (engine:
+  `hypodd.bootstrap_relocation`). The fixed 120 s wall cap silently killed healthy
+  replicas on a loaded shared box (41-event SVD replicas at ~150 s under load ~3×), so
+  bootstrap_errors.csv came back with n_boot=0 — no error, just empty error bars. The
+  bootstrap now times its un-resampled probe inversion (and the LSQR calibration when
+  that path is taken) and caps replicas at 5× that (floor 120 s, ceiling 1 h) —
+  pathological resamples still die quickly relative to the machine's actual speed.
+- **Bootstrap error bars are now precomputed before the results notebook executes** (both
+  fresh and `--augment` runs). The notebook's 2×1000-replica location-uncertainty
+  bootstraps previously ran inside a notebook cell, where a large cluster or a loaded
+  shared box could push them past nbconvert's 3600 s per-cell timeout and fail the whole
+  run (observed: 41-event SVD replicas at ~2.5 min each under load). They now run in the
+  orchestrator (no cell timeout; failure-safe — on any precompute error the notebook
+  computes in-cell as before), and the notebook cells load the cache instantly.
+- **NECIS event search read only the first result page** (engine: `necis-downloader`
+  `events.py`). The results table is paginated at 10 rows/page; during an active swarm a
+  2-day search window spans several pages, so deeper rows were invisible and the closest
+  page-1 row failed the 10 s match tolerance ("Closest NECIS row differs by ...s") — the
+  event was wrongly declared "not found on NECIS". The search now walks every `movePage`
+  page and matches across the full result set. Verified live on two previously-missed
+  Haenam aftershocks (both now match with Δ0 s).
+
+**Engine (`korea-cluster-relocation`)**
+- `evmap.pin_manifest`: materialize/extend the manifest, freezing current cuspids.
+- `xcorr`: `resume=` parameter (env `XCORR_RESUME` still honored) + `invalidate_pairs`.
+- `rereference`: `skip_tol_s` skip-unchanged fast path.
+- `hypodd.bootstrap_relocation`: event-set provenance (`nev`/`evhash`) in the cache header.
+- `core/augment.py` (new): `sum_snapshot` / `verify_sums` / `clear_bootstrap_caches`.
+- `cli/run_pipeline.py`: `--xcorr-resume`.
+
 ## 1.12.1 — 2026-06-16
 
 **Fixed**

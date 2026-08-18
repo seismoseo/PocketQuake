@@ -8,6 +8,11 @@
 #   --epi LAT,LON                   override the auto-derived epicenter (catalog centroid)
 #   --bounds LAT0,LAT1,LON0,LON1    override the auto-derived bounds (catalog bbox + 0.2°)
 #   --picker {phasenet_plus|stead}  picker model (default: phasenet_plus)
+#   --augment                       incremental mode: CATALOG is an augmented version of an
+#                                   already-processed cluster's catalog — add only the NEW
+#                                   events (download/pick/locate), reuse existing picks and
+#                                   dt.cc pairs, re-relocate the whole cluster
+#   --dry-run                       with --augment: print the catalog diff and exit
 #   --mainshock UTC_YYYYMMDDHHMMSS  also run Gwangyang-style mainshock treatment after the
 #                                   default pipeline (re-runs xcorr→dtcc, builds a _main notebook)
 #   --cores N                       cap xcorr workers (forwarded as --cores N to the eq-cycle
@@ -46,6 +51,18 @@ OPTIONS
   --epi LAT,LON                   override the auto-derived epicenter (catalog centroid)
   --bounds LAT0,LAT1,LON0,LON1    override the auto-derived bounds (catalog bbox + 0.2°)
   --picker {phasenet_plus|stead}  picker model (default: phasenet_plus)
+  --augment                       incremental mode: CATALOG is an augmented version of an
+                                  already-processed cluster's catalog. Only the NEW events
+                                  are downloaded, gathered, picked and located; existing
+                                  picks, SAC pick headers and per-pair dt.cc files are
+                                  reused (xcorr computes only new-vs-all pairs); the whole
+                                  cluster is then re-relocated (dt.ct + dt.cc + focal
+                                  mechanisms + notebook + report). Strictly additive:
+                                  aborts if the catalog is missing events that exist in
+                                  the run. Uses the cluster's stored config (epicenter,
+                                  bounds, waveform source) — don't pass --epi/--bounds.
+  --dry-run                       with --augment: print the catalog diff (new / missing
+                                  events) and exit without changing anything
   --python                        shortcut for the pure-Python pipeline:
                                   = --loc-backend hyposvi --reloc-backend relocdd_py.
                                   Uses bundled EikoNet weights (fetch once with
@@ -115,11 +132,13 @@ hdr(){ echo; echo "▸ $*"; }
 CATALOG="$1"; SLUG="$2"; shift 2
 EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""; VELMODEL="kim1983"
 LOC_BACKEND="hypoinverse"; RELOC_BACKEND="hypodd"; LOC_SET=0; RELOC_SET=0; PYTHON_SHORTCUT=0; COMPARE=0
-SKIP_DOWNLOAD=0; SKIP_PIPELINE=0
+SKIP_DOWNLOAD=0; SKIP_PIPELINE=0; AUGMENT=0; DRY_RUN=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
         --bounds)          BBOX="$2"; shift 2 ;;
+        --augment)         AUGMENT=1; shift ;;
+        --dry-run)         DRY_RUN=1; shift ;;
         --picker)          PICKER="$2"; shift 2 ;;
         --loc-backend)     LOC_BACKEND="$2"; LOC_SET=1; shift 2 ;;
         --reloc-backend)   RELOC_BACKEND="$2"; RELOC_SET=1; shift 2 ;;
@@ -141,6 +160,16 @@ done
 [[ "$SOURCE" == "necis" || "$SOURCE" == "stp" || "$SOURCE" == "mixed" ]] || fail "--source must be 'necis' | 'stp' | 'mixed' (got: $SOURCE)"
 [[ -n "$STP_CUTOFF" && "$SOURCE" != "mixed" ]] && fail "--stp-cutoff is only meaningful with --source mixed (got --source $SOURCE)"
 [[ "$MAIN_ONLY" == "1" && -z "$MAINSHOCK" ]] && fail "--mainshock-only requires --mainshock UTC_YYYYMMDDHHMMSS"
+[[ "$DRY_RUN" == "1" && "$AUGMENT" != "1" ]] && fail "--dry-run is only meaningful with --augment"
+if [[ "$AUGMENT" == "1" ]]; then
+    # Augment reuses the existing cluster's stored config (epicenter/bounds/backends/source);
+    # the other run modes conflict with the incremental workflow.
+    [[ -n "$EPI" || -n "$BBOX" ]] && fail "--augment uses the existing cluster's epicenter/bounds — drop --epi/--bounds"
+    [[ -n "$MAINSHOCK" || "$MAIN_ONLY" == "1" ]] && fail "--augment is incompatible with --mainshock/--mainshock-only (apply treatment in a follow-up run)"
+    [[ "$COMPARE" == "1" || "$PYTHON_SHORTCUT" == "1" || "$LOC_SET" == "1" || "$RELOC_SET" == "1" ]] && \
+        fail "--augment reuses the cluster's stored backends — drop --compare/--python/--loc-backend/--reloc-backend"
+    [[ "$SKIP_PIPELINE" == "1" ]] && fail "--augment needs the pipeline stages; drop --skip-pipeline"
+fi
 # --python = pure-Python backends shortcut (= --loc-backend hyposvi --reloc-backend relocdd_py)
 if [[ "$PYTHON_SHORTCUT" == "1" ]]; then
     [[ "$LOC_SET" == "1" && "$LOC_BACKEND" != "hyposvi" ]] && fail "--python implies --loc-backend hyposvi, conflicting with --loc-backend $LOC_BACKEND"
@@ -168,9 +197,12 @@ for c in Year Month Day Hour Minute Second Latitude Longitude Magnitude Depth; d
 done
 ok "catalog: $CATALOG"
 
-for c in "${EXISTING[@]}"; do
-    [[ "$SLUG" == "$c" ]] && fail "slug '$SLUG' collides with an existing cluster (${EXISTING[*]})"
-done
+# (an --augment run TARGETS an existing cluster, so the collision guard only applies to fresh runs)
+if [[ "$AUGMENT" != "1" ]]; then
+    for c in "${EXISTING[@]}"; do
+        [[ "$SLUG" == "$c" ]] && fail "slug '$SLUG' collides with an existing cluster (${EXISTING[*]})"
+    done
+fi
 ok "slug: $SLUG"
 
 [[ -f "$HERE/.env" ]] || fail "missing $HERE/.env (set NECIS_USER/NECIS_PASS for --source necis, STP_USER/STP_PASS for --source stp; mixed needs BOTH)"
@@ -250,8 +282,8 @@ if [[ "$SOURCE" == "necis" || "$SOURCE" == "mixed" ]]; then
     ok "playwright: importable (NECIS ready)"
 fi
 
-# ---- auto-derive epi / bbox from the catalog ----
-if [[ -z "$EPI" || -z "$BBOX" ]]; then
+# ---- auto-derive epi / bbox from the catalog (not needed in augment mode) ----
+if [[ "$AUGMENT" != "1" ]] && [[ -z "$EPI" || -z "$BBOX" ]]; then
     read -r EPI_AUTO BBOX_AUTO NEV MAGS YRS < <(
         "$PY" - "$CATALOG" <<'PY'
 import sys, pandas as pd
@@ -268,34 +300,51 @@ PY
     [[ -z "$BBOX" ]] && BBOX="$BBOX_AUTO"
     ok "$NEV events, $MAGS, $YRS"
 fi
-ok "epicenter:   $EPI"
-ok "region-bbox: $BBOX"
+if [[ "$AUGMENT" == "1" ]]; then
+    ok "mode:        AUGMENT (add new catalog events to the existing '$SLUG' run)"
+else
+    ok "epicenter:   $EPI"
+    ok "region-bbox: $BBOX"
+    ok "loc-backend: $LOC_BACKEND"
+    ok "reloc-bcknd: $RELOC_BACKEND"
+    ok "source:      $SOURCE"
+fi
 ok "picker:      $PICKER"
-ok "loc-backend: $LOC_BACKEND"
-ok "reloc-bcknd: $RELOC_BACKEND"
-ok "source:      $SOURCE"
 [[ -n "$STP_CUTOFF" ]] && ok "stp-cutoff:  $STP_CUTOFF (events >= this date skip STP)"
 [[ -n "$CORES"      ]] && ok "cores:       $CORES (xcorr worker cap)"
 ok "velmodel:    $VELMODEL (relocation + focal mech + notebook)"
 [[ -n "$MAINSHOCK"  ]] && ok "mainshock:   $MAINSHOCK (treatment will be applied after default run)"
 
 # ---- the orchestrator command ----
-CMD=(
-    "$PY" -u -m pocketquake.orchestrate "$CATALOG"
-    --cluster "$SLUG"
-    --epicenter "$EPI"
-    --region-bounds "$BBOX"
-    --picker "$PICKER"
-    --wf-backend "$SOURCE"
-    --loc-backend "$LOC_BACKEND"
-    --reloc-backend "$RELOC_BACKEND"
-)
-[[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
+if [[ "$AUGMENT" == "1" ]]; then
+    CMD=(
+        "$PY" -u -m pocketquake.orchestrate "$CATALOG"
+        --cluster "$SLUG"
+        --picker "$PICKER"
+        --augment
+    )
+    [[ "$DRY_RUN" == "1" ]] && CMD+=(--dry-run)
+else
+    CMD=(
+        "$PY" -u -m pocketquake.orchestrate "$CATALOG"
+        --cluster "$SLUG"
+        --epicenter "$EPI"
+        --region-bounds "$BBOX"
+        --picker "$PICKER"
+        --wf-backend "$SOURCE"
+        --loc-backend "$LOC_BACKEND"
+        --reloc-backend "$RELOC_BACKEND"
+    )
+    [[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
+    [[ "$SKIP_PIPELINE" == "1" ]] && CMD+=(--skip-pipeline)
+fi
 [[ -n "$CORES"          ]] && CMD+=(--cores "$CORES")
 [[ -n "$VELMODEL"       ]] && CMD+=(--velmodel "$VELMODEL")
 [[ "$SKIP_DOWNLOAD" == "1" ]] && CMD+=(--skip-download)
-[[ "$SKIP_PIPELINE" == "1" ]] && CMD+=(--skip-pipeline)
 LOG="$HERE/${SLUG}_run.log"
+[[ "$AUGMENT" == "1" ]] && LOG="$HERE/${SLUG}_augment.log"
+# a dry-run is a quick synchronous diff print — always foreground
+[[ "$DRY_RUN" == "1" ]] && FG=1
 
 cd "$HERE"
 if [[ "$MAIN_ONLY" == "1" ]]; then
@@ -308,7 +357,7 @@ if [[ "$MAIN_ONLY" == "1" ]]; then
     hdr "skipping default pipeline (--mainshock-only)"
     ok "cluster runs/ already present; jumping to mainshock treatment"
 elif [[ "$FG" == "1" ]]; then
-    hdr "launching default pipeline (log: $LOG)"
+    [[ "$AUGMENT" == "1" ]] && hdr "launching augmentation (log: $LOG)" || hdr "launching default pipeline (log: $LOG)"
     "${CMD[@]}" 2>&1 | tee "$LOG"
     DEFAULT_RC="${PIPESTATUS[0]}"
     [[ "$DEFAULT_RC" == "0" ]] || fail "default pipeline failed (exit $DEFAULT_RC)"

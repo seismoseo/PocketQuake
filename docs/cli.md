@@ -10,6 +10,9 @@
 
 | Option | What it does |
 |---|---|
+| `--augment` | incremental mode: `CATALOG` is an augmented version of an already-processed cluster's catalog — add only the **new** events, reuse existing picks + dt.cc pairs, re-relocate the whole cluster ([details](workflow.md#augmenting-an-existing-cluster)) |
+| `--dry-run` | with `--augment`: print the catalog diff (new / missing events) and exit |
+| `python -m pocketquake.necis_zip ZIP --cluster SLUG` | stage a manually-downloaded NECIS bulk ZIP into the cluster's waveform tree (pairs with `--augment --skip-download`; [details](workflow.md#manually-downloaded-necis-zips)) |
 | `--python` | pure-Python backend (= `--loc-backend hyposvi --reloc-backend relocdd_py`) |
 | `--compare` | run Fortran **and** Python on the same picks → side-by-side `04_compare_<slug>.ipynb` |
 | `--loc-backend {hypoinverse\|hyposvi}` | absolute-location backend (default `hypoinverse`) |
@@ -72,4 +75,8 @@ See [Workflow → Step 6](workflow.md#step-6-beamer-pdf-run-summary) for the ful
 
 # mainshock treatment
 ./pocketquake.sh ~/my_catalog.csv myswarm --mainshock 20240912144719
+
+# the sequence kept going: add the new events to the processed run (preview, then do it)
+./pocketquake.sh ~/my_catalog_updated.csv myswarm --augment --dry-run
+./pocketquake.sh ~/my_catalog_updated.csv myswarm --augment
 ```

@@ -162,6 +162,7 @@ Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](d
 
 | Option | What it does |
 |---|---|
+| `--augment` | incremental mode: the catalog is an **augmented** version of an already-processed cluster's — add only the new events (download/pick/locate), reuse existing picks + dt.cc pairs, re-relocate the whole cluster (`--dry-run` previews the diff) |
 | `--python` | pure-Python backend (= `--loc-backend hyposvi --reloc-backend relocdd_py`) |
 | `--compare` | run Fortran **and** Python on the same picks → side-by-side `04_compare_<slug>.ipynb` |
 | `--source {necis\|stp\|mixed}` | waveform source (default `necis`; use `stp`/`mixed` for **pre-2020** events) |
