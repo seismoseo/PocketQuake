@@ -3,6 +3,25 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.14.0 — 2026-08-19
+
+**Changed**
+- **The fault-coordinate frame now defaults to the SVD best-fit plane** of the relocated
+  cloud (`FRAME_FROM = "svd"` in the results notebook; `frame_from="svd"` in
+  `viz.fault_sections`, `viz.animate_seismicity`, `viz.plot_3d_plane` — so the notebook,
+  the beamer PDF, the 3-D view and the time-lapse GIF all agree). The section frame is
+  then a property of **the relocation**: constrained by every relocated event, independent
+  of any focal mechanism, and free of the grade/size limitations of the single reference
+  event the previous `"auto"` default leaned on. The reference beachball is still drawn on
+  the map panel and the title reports both planes, so mechanism-vs-seismicity agreement
+  stays visible (2026_Haenam: `strike 94°/dip 67° [SVD best-fit plane]; mechanism
+  NP1=180°/77° (A)`). `"auto"` (the previous default) and `"mechanism"` are unchanged and
+  still selectable; explicit `strike=`/`dip=` still wins over everything.
+  Caveat documented in the notebook and docstrings: for a **near-equant** cloud the SVD
+  *strike* is weakly determined even when the plane itself is well-defined (2026 Haenam's
+  singular values are 372/269/45 m — 6:1 flattening but only 1.4:1 in-plane elongation);
+  prefer `"auto"` or an explicit plane there.
+
 ## 1.13.0 — 2026-08-18
 
 **Added**

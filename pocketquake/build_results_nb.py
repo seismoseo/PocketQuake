@@ -28,14 +28,20 @@ RUN_SUFFIX = "_pnplus"          # output tree = runs/<cluster><suffix>; "" = the
 VELMODEL   = "kim1983"          # velocity model whose .sum / mechanisms to show
 N_BOOT     = 1000               # bootstrap replicas for the 95% location error bars (cached)
 BOOT_SEED  = 0                  # bootstrap RNG seed (reproducible)
-FRAME_FROM = "auto"             # fault-frame plane for sections 4 & 5:
-                                #   "auto"      — mainshock nodal plane (NP1/NP2 matched to SVD strike)
-                                #                 if a grade-A/B mechanism exists; else SVD fallback.
-                                #   "svd"       — always use the SVD best-fit plane of the relocated cloud.
-                                #                 Use this when the mechanism is unreliable (small mainshock,
-                                #                 grade C/D) but the relocation forms a clear lineation
-                                #                 (Uiseong-type cases).
+FRAME_FROM = "svd"              # fault-frame plane for sections 4 & 5:
+                                #   "svd"       — DEFAULT (v1.14.0+): the SVD best-fit plane of the
+                                #                 relocated cloud. The plane is then a property of the
+                                #                 relocation itself — every event constrains it, it needs
+                                #                 no focal mechanism, and it degrades gracefully when the
+                                #                 reference mechanism is small/low-grade. The reference
+                                #                 beachball is still drawn for comparison.
+                                #   "auto"      — pre-v1.14.0 default: mainshock nodal plane (NP1/NP2
+                                #                 matched to SVD strike) if a grade-A/B mechanism exists;
+                                #                 else SVD fallback.
                                 #   "mechanism" — always use the mainshock nodal plane (raises if absent).
+                                # NOTE: for a near-equant cloud the SVD strike is weakly determined
+                                #       (check the s1/s2 aspect printed by section 5); prefer "auto"
+                                #       or an explicit strike=/dip= there.
 
 # Bootstrap "under-constrained" drop thresholds — events failing any of these are dropped from
 # every dt.cc/dt.ct plot (and from the section/3-D views). Symmetric horizontal + vertical caps;
@@ -301,13 +307,19 @@ an **along-strike** depth section (A–A'), an **across-strike** depth section (
 and a **fault-plane (along-dip) view**. Markers are coloured by origin time (so migration is visible)
 and sized by magnitude.
 
-The orientation comes from `FRAME_FROM` in the params block above: `"auto"` (default) uses the
-mainshock's nodal plane (NP1/NP2 matched to SVD strike) when a grade-A/B mechanism is available;
-`"svd"` forces the data-driven SVD best-fit plane (use this when the relocation lineation is
-strong but the mechanism is small/unreliable — e.g. Uiseong, where a clear N-S aftershock streak
-disagrees with the grade-B mainshock's nodal strike); `"mechanism"` always uses the mechanism.
-Pass `strike=`/`dip=` to override entirely. A tight across-strike spread indicates a near-planar
-fault.
+The orientation comes from `FRAME_FROM` in the params block above. The **default is `"svd"`**:
+the best-fit plane through the relocated hypocentres themselves, so the reference frame is a
+property of *the relocation* — constrained by every event, independent of any focal mechanism,
+and free of the grade/size limitations of one reference event. The reference beachball is still
+drawn on the map panel, so you can still judge mechanism-vs-seismicity agreement by eye.
+Alternatives: `"auto"` (the pre-v1.14.0 default) takes the mainshock's nodal plane (NP1/NP2
+matched to the SVD strike) when a grade-A/B mechanism exists; `"mechanism"` always uses the
+mechanism. Pass `strike=`/`dip=` to override entirely.
+
+Read the panels together: a tight **across-strike** spread indicates a near-planar fault, and
+the along-/across-strike extents in the title tell you how well-determined the SVD strike is —
+for a near-equant cloud (extents within ~1.5×) the strike is weakly constrained and `"auto"`
+or an explicit plane is the better choice.
 
 Two views are rendered side-by-side: (a) the **simple hypoDD.reloc** (SOTA default — every event
 shown, no bootstrap drops, no error bars), and (b) the **bootstrap diagnostic** (drops the
