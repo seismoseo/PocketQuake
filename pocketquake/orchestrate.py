@@ -75,10 +75,19 @@ def _precompute_bootstraps(cluster: str) -> None:
     Without this, a large cluster (or a loaded shared box) can push a 2x1000-replica
     in-cell bootstrap past nbconvert's 3600 s per-cell timeout and fail the whole run
     (observed: 41-event SVD replicas at ~2.5 min each under load). Failure-safe: on any
-    error here the notebook simply computes in-cell as before."""
+    error here the notebook simply computes in-cell as before.
+
+    N_BOOT / BOOT_SEED live in the notebook TEMPLATE (they are params of the generated
+    notebook, not module attributes), so they are parsed out of it — that keeps the
+    precomputed cache keyed identically to what the notebook will ask for; a mismatch
+    would simply miss the cache and recompute in-cell."""
+    import re
     import time
-    from pocketquake.build_results_nb import N_BOOT, BOOT_SEED
     try:
+        from pocketquake import build_results_nb as _brnb
+        _src = open(_brnb.__file__).read()
+        n_boot = int(re.search(r"^N_BOOT\s*=\s*(\d+)", _src, re.M).group(1))
+        boot_seed = int(re.search(r"^BOOT_SEED\s*=\s*(\d+)", _src, re.M).group(1))
         cfg = _load_cluster_cfg(cluster)
         if getattr(cfg, "reloc_backend", "hypodd") == "relocdd_py":
             from pipeline.core import relocdd_py_backend as _backend
@@ -86,7 +95,7 @@ def _precompute_bootstraps(cluster: str) -> None:
             from pipeline.core import hypodd as _backend
         for br in ("dtct", "dtcc"):
             t0 = time.time()
-            _backend.bootstrap_relocation(cfg, branch=br, n=N_BOOT, seed=BOOT_SEED)
+            _backend.bootstrap_relocation(cfg, branch=br, n=n_boot, seed=boot_seed)
             print(f"[pocketquake] bootstrap[{br}]: cached for the notebook "
                   f"({time.time() - t0:.0f}s)", flush=True)
     except Exception as e:  # noqa: BLE001 — the notebook can still compute in-cell
