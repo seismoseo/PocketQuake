@@ -3,7 +3,7 @@
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
 !!! info inline end "Version"
-    **v1.12.1** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
+    **v1.14.1** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
 
 PocketQuake glues two projects into a single reproducible workflow for Korean earthquake sequences:
 
@@ -49,4 +49,4 @@ See [Two relocation modes](relocation-modes.md).
 </div>
 
 !!! tip "Slides"
-    A beamer **[tutorial PDF](tutorial/PocketQuake_manual.pdf)** walks through install → run → outputs.
+    A beamer **[tutorial PDF](tutorial/pocketquake_tutorial.pdf)** walks through install → run → outputs.

@@ -3,6 +3,29 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.14.1 — 2026-08-21
+
+**Documentation** (no functional change)
+- **Documented the v1.14.0 SVD fault frame**, which until now existed only in the
+  changelog and the generated notebook's own prose. New "The fault-coordinate frame
+  (`FRAME_FROM`)" section in `docs/workflow.md` with the `svd`/`auto`/`mechanism` table,
+  a README paragraph, and a tutorial slide — all stating that it is a **notebook
+  parameter, not a CLI flag** (there is no `--frame`), and carrying the near-equant
+  caveat: a flat but roughly circular cloud has a well-determined *plane* and a poorly
+  determined *strike within it* (2026 Haenam: 372/269/45 m — 6:1 out-of-plane flattening,
+  only 1.4:1 in-plane).
+- **`--augment` and `python -m pocketquake.necis_zip` reach the tutorial deck.** Both were
+  already covered in `docs/workflow.md`, `docs/cli.md` and the README, but the beamer
+  tutorial — the document a first-time user is pointed at — did not mention either. Added
+  an augmentation slide (reuse guarantees, additivity, idempotency, cuspid pinning), a
+  bulk-ZIP staging slide, and an `--augment` row in the options reference.
+- Version strings bumped 1.12.1 → 1.14.0 in `docs/index.md`, `mkdocs.yml` and the
+  tutorial's `\pqversion`; tutorial PDF recompiled.
+- Removed `docs/tutorial/PocketQuake_manual.pdf` — a stale v1.12.1 build of the *same*
+  beamer deck, uploaded separately and never regenerated, which `docs/index.md` linked to
+  instead of the maintained `pocketquake_tutorial.pdf`. The link now points at the real
+  artifact, so the published tutorial can no longer silently lag the source.
+
 ## 1.14.0 — 2026-08-19
 
 **Changed**

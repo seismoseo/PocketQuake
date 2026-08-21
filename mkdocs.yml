@@ -4,7 +4,7 @@ site_url: https://pocketquake.readthedocs.io/
 repo_url: https://github.com/seismoseo/PocketQuake
 repo_name: seismoseo/PocketQuake
 edit_uri: edit/main/docs/
-copyright: PocketQuake v1.12.1 &middot; Made by Min-Seong Seo / SGTL, SNU
+copyright: PocketQuake v1.14.1 &middot; Made by Min-Seong Seo / SGTL, SNU
 
 theme:
   name: material

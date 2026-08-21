@@ -31,7 +31,7 @@
 }
 
 % Keep \pqversion in sync with pocketquake.__version__ (single source of truth).
-\newcommand{\pqversion}{1.12.1}
+\newcommand{\pqversion}{1.14.1}
 \title{PocketQuake}
 \subtitle{From a catalog CSV to a relocation notebook in one command}
 \author{Min-Seong Seo / SGTL, SNU}
@@ -330,6 +330,34 @@ cross-correlation matrix} (5--20\,Hz) in chronological and \textbf{hierarchical-
 dendrogram (right). A near-repeating family reads as near-identical traces / a uniformly bright block.
 \end{frame}
 
+% ----------------------------------------------------------------- output 5
+\begin{frame}{Output 5 --- Fault-coordinate sections (SVD frame, v1.14.0+)}
+\begin{columns}[T,onlytextwidth]
+\column{0.56\textwidth}
+\includegraphics[width=\textwidth]{figures/08_fault_sections.png}
+\column{0.42\textwidth}
+\scriptsize
+The relocated cloud rotated into a fault frame: map view, along-strike and across-strike
+depth sections (dashed = dip), and the along-dip view.
+\smallskip
+
+Since \textbf{v1.14.0} the frame defaults to the \textbf{SVD best-fit plane of the cloud}
+(\texttt{FRAME\_FROM = "svd"}) --- a property of \emph{the relocation}, constrained by every
+event, needing no focal mechanism. The beachball is still drawn and the title reports both
+planes.
+\smallskip
+
+\textbf{Caveat.} A near-equant cloud has a good \emph{plane} but a weak \emph{strike within
+it}. Check the singular values in section 5: 2026 Haenam gives 372/269/45\,m --- 6:1
+flattening, but only 1.4:1 in-plane. Use \texttt{"auto"} or an explicit
+\texttt{strike=}/\texttt{dip=} there.
+\smallskip
+
+\texttt{FRAME\_FROM} is a \textbf{notebook parameter, not a CLI flag}: edit the params cell of
+\texttt{03\_results\_<cluster>.ipynb}. \emph{(Layout from chungju; it predates the SVD default.)}
+\end{columns}
+\end{frame}
+
 % ----------------------------------------------------------------- run own
 \begin{frame}[fragile]{Run on your own catalog}
 \begin{enumerate}
@@ -354,9 +382,59 @@ dendrogram (right). A near-repeating family reads as near-identical traces / a u
 \end{enumerate}
 \end{frame}
 
+% ----------------------------------------------------------------- augmentation
+\begin{frame}[fragile]{Adding new events later (\texttt{-{}-augment}, v1.13.0+)}
+A sequence is still going, or the catalog grew. \textbf{Do not re-run the cluster from
+scratch} --- add only what is new:
+\begin{lstlisting}[language=bash]
+./pocketquake.sh ~/my_catalog_updated.csv myswarm --augment --dry-run
+./pocketquake.sh ~/my_catalog_updated.csv myswarm --augment
+\end{lstlisting}
+\smallskip
+\footnotesize
+Only the \textbf{new} events are downloaded, gathered, picked and located. Existing picks, SAC
+pick headers and per-pair \texttt{dt.cc} files are reused (\texttt{xcorr} computes only
+new-vs-all pairs); the \emph{whole} cluster is then re-relocated.
+\smallskip
+\begin{description}\scriptsize
+  \item[Strictly additive] aborts and lists any event in the run but missing from the new
+        catalog. Drifted lat/lon/depth/mag are warned; original rows stay.
+  \item[Idempotent] interrupted runs resume; ``nothing to add'' exits clean; events the source
+        cannot serve yet are skipped and retried next time.
+  \item[Identity pinned] \texttt{event\_manifest.csv} freezes existing HypoDD cuspids and
+        appends new ones, so cached pair files stay valid even when new events interleave in
+        time with the old.
+\end{description}
+\smallskip
+\scriptsize Uses the cluster's stored epicenter / bounds / source, so
+\texttt{-{}-epi}/\texttt{-{}-bounds}, \texttt{-{}-mainshock} and the backend switches are
+rejected (apply those in a follow-up run).
+\end{frame}
+
+% ----------------------------------------------------------------- necis zip
+\begin{frame}[fragile]{When the download will not serve an event yet}
+Recent events sometimes are not on the NECIS API yet, but \emph{are} downloadable by hand
+from the NECIS event-search cart. Stage that bulk ZIP, then augment offline:
+\begin{lstlisting}[language=bash]
+python -m pocketquake.necis_zip ~/Downloads/422892.zip \
+    --cluster myswarm --dry-run
+python -m pocketquake.necis_zip ~/Downloads/422892.zip --cluster myswarm
+
+./pocketquake.sh ~/my_catalog_updated.csv myswarm \
+    --augment --skip-download
+\end{lstlisting}
+\smallskip
+\footnotesize
+The outer ZIP holds one \texttt{<NECIS\_ID>.\{a,v\}.zip} per event. Events are identified from
+the \textbf{origin-stamped miniSEED} names (\texttt{NET.STA.CHA.YYYY.DDD.HH.MM.SS}), which are
+identical across every trace of one event --- never from SAC names, which carry per-station
+segment start times. Only events in the cluster catalog are staged, and by default only those
+whose waveforms are missing.
+\end{frame}
+
 % ----------------------------------------------------------------- options reference
 \begin{frame}[fragile]{Command-line options (\texttt{./pocketquake.sh -{}-help})}
-\footnotesize
+\scriptsize
 \begin{description}
   \item[\texttt{-{}-python}] pure-Python backend (HypoSVI + relocDD-py; no Fortran)
   \item[\texttt{-{}-compare}] run Fortran \emph{and} Python on the same picks $\to$ side-by-side notebook
@@ -365,6 +443,8 @@ dendrogram (right). A near-repeating family reads as near-identical traces / a u
   \item[\texttt{-{}-skip-download}] reuse waveforms already on disk (skip the slow download)
   \item[\texttt{-{}-skip-pipeline}] scaffold + download only (no relocation / notebook)
   \item[\texttt{-{}-mainshock <UTC>}] add Gwangyang-style mainshock treatment (\texttt{\_main} notebook)
+  \item[\texttt{-{}-augment}] add only the \emph{new} catalog events to an existing cluster, reusing
+        picks + dt.cc pairs (\texttt{-{}-dry-run} previews the diff)
   \item[\texttt{-{}-picker phasenet\_plus\,|\,stead}] picker model (\texttt{stead} needs no EQNet)
   \item[\texttt{-{}-velmodel kim1983\,|\,kim2011}] velocity model for relocation + focal mech + notebook
   \item[\texttt{-{}-cores N}] cap xcorr workers (default $\sim$10)

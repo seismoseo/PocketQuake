@@ -217,6 +217,14 @@ catalog walkthrough is at [examples/chungju/README.md](examples/chungju/README.m
 
 *The dt.cc relocated cloud rotated into the SVD best-fit fault frame: fault-plane map view, along-strike depth section, across-strike depth section (dashed dip line), and the along-dip view. Markers coloured by origin time, sized by magnitude.*
 
+Since **v1.14.0** the frame comes from the **SVD best-fit plane of the relocated cloud**
+(`FRAME_FROM = "svd"`), so it is a property of the relocation — constrained by every event,
+needing no focal mechanism, and free of the grade/size limits of one reference event. The
+beachball is still drawn and the title reports both planes. `"auto"` (the previous default)
+and `"mechanism"` remain selectable in the notebook's params cell; note that a *near-equant*
+cloud has a well-determined plane but a poorly-determined strike within it — see
+[the frame section in docs/workflow.md](docs/workflow.md#the-fault-coordinate-frame-frame_from).
+
 That single command:
 
 1. scaffolds `external/korea-cluster-relocation/changnyeong/{event_catalog,station_table,kma_waveforms}/`,

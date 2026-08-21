@@ -120,6 +120,46 @@ Each stage's output goes under `external/korea-cluster-relocation/pipeline/runs/
 - **3-D plotly view** — `viz.plot_3d_plane` with the best-fit plane overlay.
 - **Polarity quality** — `viz.polarity_quality`, optionally `viz.polarity_vs_manual` (Gwangyang-only).
 
+### The fault-coordinate frame (`FRAME_FROM`)
+
+The fault sections, the 3-D view and the time-lapse GIF all need a **plane to measure
+against** — something to call "along strike" and "across strike". Since **v1.14.0** that
+plane defaults to the **SVD best-fit plane of the relocated cloud**:
+
+```python
+FRAME_FROM = "svd"      # params cell of 03_results_<cluster>.ipynb
+```
+
+The frame is then a property of *the relocation itself*: every relocated event constrains
+it, it needs no focal mechanism at all, and it does not inherit the grade or size limits of
+whichever single event happened to provide the reference mechanism. The reference beachball
+is still drawn on the map panel and the title reports **both** planes, so you can still judge
+mechanism-vs-seismicity agreement by eye.
+
+| Value | Plane used |
+|---|---|
+| `"svd"` | **default (v1.14.0+)** — best-fit plane through the relocated hypocentres |
+| `"auto"` | pre-v1.14.0 default: the mainshock's nodal plane (NP1/NP2 matched to the SVD strike) when a grade-A/B mechanism exists, else SVD |
+| `"mechanism"` | always the reference mechanism's nodal plane |
+
+Passing `strike=`/`dip=` to `viz.fault_sections` overrides everything.
+
+!!! warning "A near-equant cloud has a well-defined plane but a poorly-defined strike"
+    SVD gives you the plane and the in-plane axes together, and those are not equally well
+    determined. If the cloud is flat but roughly circular *within* the plane, the plane is
+    solid while the strike direction inside it is nearly arbitrary — small changes in the
+    catalog can swing it.
+
+    Check the singular values printed in section 5. The 2026 Haenam cluster is the worked
+    example: **372 / 269 / 45 m**. The out-of-plane axis is 6× smaller than the next
+    (269/45), so the *plane* is excellent — but the two in-plane axes differ by only 1.4×
+    (372/269), so the *strike within it* is weakly constrained. Prefer `"auto"` or an
+    explicit `strike=`/`dip=` there.
+
+`FRAME_FROM` is a **notebook parameter, not a CLI flag** — there is no `--frame`. To change
+it, edit the params cell of the generated `03_results_<cluster>.ipynb` and re-run the
+notebook, or call `viz.fault_sections(cfg, velmodel, frame_from=...)` directly.
+
 ## Step 6 — beamer PDF run summary
 
 The final `report` stage (`pipeline.reporting.make_run_summary`) compiles a uniform **beamer PDF** summary of the run from the products already on disk — a portable, presentation-ready companion to the notebook. PocketQuake runs it automatically after the notebook; you can also run it on its own:

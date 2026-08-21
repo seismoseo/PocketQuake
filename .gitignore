@@ -38,8 +38,16 @@ CLAUDE.md
 # scratch run logs
 *_run.log
 
-# tectonic build artifact (the tracked manual is PocketQuake_manual.pdf)
-docs/tutorial/pocketquake_tutorial.pdf
+# docs/tutorial/pocketquake_tutorial.pdf IS tracked, deliberately.
+#
+# It used to be ignored, with a separately hand-uploaded PocketQuake_manual.pdf tracked
+# in its place. That is exactly how the published tutorial went stale: the ignored file
+# was the one the build produced, the tracked file was the one docs/index.md linked to,
+# and nothing kept them in step — the uploaded copy sat at v1.12.1 while the source moved
+# on. Read the Docs serves this PDF straight out of docs/, so it has to be committed.
+#
+# When you edit the .tex, recompile before committing:
+#   cd docs/tutorial && tectonic pocketquake_tutorial.tex
 
 # MkDocs build output
 site/
