@@ -83,8 +83,10 @@ projects are research-staging code that doesn't have stable releases.
 ### EQNet (PhaseNet+ — the default picker)
 
 The default `--picker phasenet_plus` runs the EQNet implementation of PhaseNet+.
-You need the EQNet repo on disk and pointed at via `EQNET_DIR`. Weights are
-bundled inside the repo at `docs/model_phasenet_plus/model_99.pth`.
+You need the EQNet repo on disk and pointed at via `EQNET_DIR`. The PhaseNet+
+weights are **no longer bundled in the EQNet repo** -- download `model_99.pth`
+(~18 MB) from the EQNet *PhaseNet-Plus-v1* release and place it at the path
+PocketQuake expects, `docs/model_phasenet_plus/model_99.pth` inside EQNET_DIR.
 
 ```bash
 # 1. Clone EQNet next to PocketQuake
@@ -92,6 +94,12 @@ cd ~/works           # or any location you like
 git clone https://github.com/AI4EPS/EQNet.git
 cd EQNet
 pip install -r requirements.txt   # PhaseNet+ extras (PyTorch is already in the pocketquake env)
+
+# 1b. Fetch the PhaseNet+ weights (not bundled since mid-2026)
+mkdir -p docs/model_phasenet_plus
+gh release download PhaseNet-Plus-v1 --repo AI4EPS/EQNet \
+   --pattern model_99.pth --dir docs/model_phasenet_plus
+# (or download model_99.pth from the release page in a browser)
 
 # 2. Point PocketQuake at it
 echo "EQNET_DIR=$PWD" >> ~/works/PocketQuake/.env
@@ -117,7 +125,9 @@ The `focal_mechanism` stage at the end of the default pipeline runs SKHASH.
 # 1. Clone SKHASH (USGS GitLab)
 cd ~/works
 git clone https://code.usgs.gov/esc/SKHASH.git
-cd SKHASH/SKHASH       # the inner dir that contains SKHASH.py
+cd SKHASH/src/SKHASH   # the dir that contains SKHASH.py
+# (older SKHASH checkouts used SKHASH/SKHASH/ -- SKHASH_DIR must simply be
+#  whichever directory holds SKHASH.py)
 
 # 2. SKHASH's deps are already covered by environment.yml (numpy + scipy + pandas).
 

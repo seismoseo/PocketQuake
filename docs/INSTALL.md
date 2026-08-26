@@ -107,7 +107,9 @@ PhaseNet+ produces.
 ```bash
 cd ~/works
 git clone https://code.usgs.gov/esc/SKHASH.git
-echo "SKHASH_DIR=$PWD/SKHASH/SKHASH" >> ~/works/PocketQuake/.env
+# SKHASH_DIR = the directory that contains SKHASH.py
+# (current upstream: SKHASH/src/SKHASH; older checkouts: SKHASH/SKHASH)
+echo "SKHASH_DIR=$PWD/SKHASH/src/SKHASH" >> ~/works/PocketQuake/.env
 ```
 
 SKHASH's Python deps (numpy, scipy, pandas) are already in the `pocketquake`
@@ -136,7 +138,7 @@ that NECIS no longer serves as packaged event archives.
 ## 7. Smoke test — chungju example
 
 ```bash
-./pocketquake.sh examples/chungju/catalog.csv chungju_smoke
+./pocketquake.sh examples/chungju/chungju_catalog.csv chungju_smoke
 ```
 
 Expected end-state (default pipeline, ~30 min for the 4-event chungju
@@ -170,7 +172,7 @@ relative location only:
 ```bash
 # In .env, leave EQNET_DIR and SKHASH_DIR unset.
 # Then for every run, force the SeisBench PhaseNet picker:
-./pocketquake.sh examples/chungju/catalog.csv chungju_smoke \
+./pocketquake.sh examples/chungju/chungju_catalog.csv chungju_smoke \
     --picker stead --skip-pipeline-stage focal_mechanism
 ```
 

@@ -73,7 +73,7 @@ The default pipeline runs SKHASH at the end. Two fixes:
 - **Install SKHASH**:
   ```bash
   git clone https://code.usgs.gov/esc/SKHASH.git ~/works/SKHASH
-  echo "SKHASH_DIR=$HOME/works/SKHASH/SKHASH" >> .env
+  echo "SKHASH_DIR=$HOME/works/SKHASH/src/SKHASH" >> .env   # = the dir containing SKHASH.py
   ```
 - **Or skip the stage**: end the pipeline at `dtcc` instead of
   `focal_mechanism`. Pass through the lower-level CLI (`pipeline.cli.run_pipeline`)

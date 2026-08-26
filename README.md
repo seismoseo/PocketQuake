@@ -102,10 +102,10 @@ playwright install chromium       # one-time, ~200 MB
 cp .env.example .env              # then edit NECIS_USER / NECIS_PASS
 
 # 5. Run the chungju example end-to-end.
-./pocketquake.sh examples/chungju/catalog.csv mytest
+./pocketquake.sh examples/chungju/chungju_catalog.csv mytest
 
 # Full CLI form (when you want explicit control):
-pocketquake examples/chungju/catalog.csv \
+pocketquake examples/chungju/chungju_catalog.csv \
     --cluster chungju \
     --epicenter 36.96,127.78 \
     --region-bounds 36.85,37.10,127.65,127.95
