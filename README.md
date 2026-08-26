@@ -78,7 +78,10 @@ Both upstream projects are included as **git submodules** under `external/`, so
 ## Quickstart
 
 Full install walkthrough (conda env, external binaries, credentials):
-[**docs/INSTALL.md**](docs/INSTALL.md). The condensed version:
+[**docs/INSTALL.md**](docs/INSTALL.md). No git (e.g. Windows)? Download the
+full-source ZIP — submodules included — from the
+[Releases page](https://github.com/seismoseo/PocketQuake/releases).
+The condensed version:
 
 ```bash
 git clone --recurse-submodules https://github.com/seismoseo/PocketQuake.git

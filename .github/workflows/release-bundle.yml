@@ -1,0 +1,22 @@
+name: Attach full-source bundle to releases
+# GitHub's auto "Source code (zip)" ships EMPTY submodule dirs; this attaches a
+# runnable bundle (superproject + submodules, generated result notebooks pruned).
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Build bundle
+        run: tools/make_release_bundle.sh "PocketQuake-${{ github.event.release.tag_name }}-full-source.zip"
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" PocketQuake-*-full-source.zip --clobber

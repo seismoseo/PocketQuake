@@ -7,6 +7,19 @@ The default pipeline is **PhaseNet+ → HypoInverse → HypoDD → SKHASH focal
 mechanism**, so this guide installs everything that chain needs. STP is
 optional (only for pre-2020 waveforms).
 
+## Installing without git (Windows-friendly ZIP)
+
+GitHub's automatic "Download ZIP" of this repository ships **empty** submodule
+directories, so it does not produce a runnable tree. Instead, download
+**`PocketQuake-<version>-full-source.zip`** from the
+[Releases page](https://github.com/seismoseo/PocketQuake/releases) — it bundles
+PocketQuake plus both submodules (korea-cluster-relocation, necis-downloader)
+at their pinned versions, contains no symlinks (safe to extract on Windows),
+and records the exact commit SHAs in `BUNDLE_INFO.txt`. The ~700 MB of
+generated per-cluster result notebooks are excluded (the pipeline regenerates
+them; browse the committed ones on GitHub). After extracting, continue with
+the conda environment setup below exactly as for a git checkout.
+
 ## 0. Prerequisites
 
 - **OS**: Linux or macOS (wrapper is bash; Windows users need WSL)
