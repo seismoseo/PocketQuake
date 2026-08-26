@@ -51,3 +51,14 @@ CLAUDE.md
 
 # MkDocs build output
 site/
+
+# Working products of local runs. These are per-user inputs and outputs, not part of
+# the package: catalogs you feed in, the logs each run writes, figures you generate,
+# and manually-downloaded NECIS bulk ZIPs (multi-GB). They were previously loose in
+# the repo root, where they buried the ~15 tracked files and filled `git status`.
+catalogs/
+logs/
+figures/
+downloads/
+*_run.log
+*_augment.log
