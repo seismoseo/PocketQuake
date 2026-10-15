@@ -37,7 +37,6 @@ from datetime import datetime
 from glob import glob
 
 from pocketquake import EQCYCLE_DIR
-from pocketquake.necis_bridge import download_events
 from pocketquake import source_dispatch
 
 
@@ -162,10 +161,15 @@ def _preflight(cfg, cluster: str, velmodel: str, picker: str) -> None:
 
 # --------------------------------------------------------------- downloads
 def _download_new(cfg, cluster: str, subset_csv: str) -> None:
-    """Fetch waveforms for the new events only, honoring the cluster's wf_source."""
-    from pocketquake.orchestrate import _download_stp_for_cluster
+    """Fetch waveforms for the new events only, honoring the cluster's wf_source and its
+    recorded KIGAM choice (waveform_sources.json), so new events get the same networks."""
+    from pocketquake.orchestrate import _download_stp_for_cluster, _download_necis
+    from pocketquake.necis_bridge import kigam_enabled
     src_root = cfg.src_root
-    networks = ("KS",) if cfg.wf_source == "kma_archive" else ("KS", "KG")
+    kigam = kigam_enabled(src_root)
+    networks = ("KS",) if (cfg.wf_source == "kma_archive" and not kigam) else ("KS", "KG")
+    if kigam:
+        print("[augment] cluster was built with --kigam: new NECIS events also get KG from KIGAM")
     if cfg.wf_source == "stp_sac":
         _download_stp_for_cluster(cluster, networks=networks, catalog_csv_override=subset_csv)
     elif cfg.wf_source == "mixed":
@@ -175,12 +179,9 @@ def _download_new(cfg, cluster: str, subset_csv: str) -> None:
         if len(failed):
             fb = os.path.join(src_root, "event_catalog", "event_catalog_augment_necis.csv")
             source_dispatch.write_subset(failed, fb)
-            download_events(catalog_csv=fb, out_root=os.path.join(src_root, "kma_waveforms"),
-                            data_types=("a", "v"), convert_sac=True)
-    else:                                              # "kma_archive" -> NECIS
-        download_events(catalog_csv=subset_csv,
-                        out_root=os.path.join(src_root, "kma_waveforms"),
-                        data_types=("a", "v"), convert_sac=True)
+            _download_necis(fb, os.path.join(src_root, "kma_waveforms"), kigam=kigam)
+    else:                                              # "kma_archive" -> NECIS (+ KIGAM)
+        _download_necis(subset_csv, os.path.join(src_root, "kma_waveforms"), kigam=kigam)
 
 
 # --------------------------------------------------------------- the driver

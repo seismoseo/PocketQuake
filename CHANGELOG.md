@@ -3,6 +3,43 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.15.0 — 2026-10-15
+
+**Added**
+- **`--kigam`: the KG network for NECIS-era events, from KIGAM Quake** (issue #4). NECIS
+  event files carry only the KMA KS network, so NECIS-sourced clusters had no KIGAM KG
+  stations, while STP-sourced ones did. With `--kigam` (`--source necis` or `mixed`), the
+  events NECIS serves also get KG waveforms from KIGAM Quake's FDSN `dataselect` service.
+  They are written to `kma_waveforms/<event>/KIGAM.{v,a}/` next to the NECIS folders, so
+  the existing `KMA_GLOB` reads KS and KG alike with no pipeline change. The window is
+  origin −240 s … +360 s (the span NECIS event files cover), and only the sensors the
+  pipeline reads are fetched (HH, EL, HG). Events NECIS does not list at all, the case in
+  the issue (5 of 12 Namwon events), still get KG. Networks become `KS,KG`.
+- **Opt-in, recorded, and followed by `--augment`**: adding KG changes a cluster's station
+  set, so the default is unchanged. The choice is written to
+  `<cluster>/waveform_sources.json`, and `--augment` fetches new events the same way. A
+  cluster built without `--kigam` (including every cluster from before this release) never
+  gets KG mixed in. `--kigam` with `--augment` or `--source stp` is refused, and `--networks`
+  containing KG on the NECIS backend without `--kigam` now warns that those stations will
+  have no data.
+- Access needs a KIGAM open-API key (`KIGAM_TOKEN` or `~/.config/kigam/openapi_token`).
+  KIGAM accepts it only from registered IP addresses; elsewhere set
+  `KIGAM_SSH_TUNNEL=user@registered-host` or `KIGAM_PROXY` (docs/EXTERNAL_TOOLS.md).
+
+**Changed**
+- `external/necis-downloader` → 7c3c75f (v1.1.0: KIGAM Quake source; NECIS's
+  already-downloaded check no longer mistakes a `KIGAM.*` folder for the KS download).
+
+**Verified**: the 12 Namwon events each got 297 KG channels. Through the pipeline's own
+`select_nearby` / `discover_used` / `gather_event`, all 10 KG stations within 100 km were
+selected (6 HH, 2 EL, 2 HG) and gathered for every event (30 files each), with correct
+event/station headers and the −240/+360 s window. Downloaded KG days match MARA's
+archive sample for sample (necis-downloader).
+
+**Documentation**: README, `docs/cli.md`, `docs/EXTERNAL_TOOLS.md` (KIGAM key section),
+`.env.example`, and the tutorial (flag added; that slide now shrinks to fit — it was
+already cutting off `--xcorr-backend`); version strings → 1.15.0, tutorial PDF recompiled.
+
 ## 1.14.1 — 2026-08-21
 
 **Documentation** (no functional change)

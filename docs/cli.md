@@ -19,6 +19,7 @@
 | `--reloc-backend {hypodd\|relocdd_py}` | relocation backend (default `hypodd`) |
 | `--source {necis\|stp\|mixed}` | waveform source (default `necis`; use `stp`/`mixed` for **pre-2020** events) |
 | `--stp-cutoff YYYY-MM-DD` | with `--source mixed`: events on/after this date skip STP, go straight to NECIS |
+| `--kigam` | with `--source necis\|mixed`: also fetch **KG** waveforms from KIGAM Quake for the events NECIS serves, into `kma_waveforms/<event>/KIGAM.{v,a}/` (networks become KS+KG; recorded in `waveform_sources.json` so `--augment` does the same; [key setup](EXTERNAL_TOOLS.md#kigam-quake-key)) |
 | `--skip-download` | reuse waveforms already on disk — skip the (slow) download stage |
 | `--skip-pipeline` | scaffold + download only (skip relocation + notebook) |
 | `--mainshock UTC_YYYYMMDDHHMMSS` | add Gwangyang-style mainshock treatment (builds a `_main` notebook) |
@@ -35,7 +36,7 @@
 
 Skips **only** the download stage; everything downstream still runs (gather existing SAC → re-pick → re-locate → re-relocate → notebook). The waveforms must already be under the cluster's source dir:
 
-- `--source necis` → `kma_waveforms/`
+- `--source necis` → `kma_waveforms/` (with `--kigam`, KG in `kma_waveforms/<event>/KIGAM.{v,a}/`)
 - `--source stp` / `mixed` → `stp_download/SAC/`
 
 If 0 waveforms are found the run stops with a clear message (often the wrong `--source` — pre-2020 data is STP-served).

@@ -10,7 +10,7 @@
 
 PocketQuake glues two existing projects:
 
-- **[seismoseo/necis-downloader](https://github.com/seismoseo/necis-downloader)** — downloads KMA NECIS waveforms for a given event list.
+- **[seismoseo/necis-downloader](https://github.com/seismoseo/necis-downloader)** — downloads KMA NECIS (KS) waveforms for a given event list, and KIGAM Quake (KG) waveforms for `--kigam`.
 - **[seismoseo/korea-cluster-relocation](https://github.com/seismoseo/korea-cluster-relocation)** — HypoDD relocation + SKHASH focal-mechanism pipeline.
 
 For **older events** (pre-~2020) that NECIS no longer serves as downloadable event
@@ -19,6 +19,13 @@ Protocol at `mara.snu.ac.kr:46804`) instead — same one-command flow, just pass
 `--source stp`. See [examples/sangju/](examples/sangju/README.md) for a 2018–2022 worked
 example where the M3.9 mainshock and its aftershocks live in STP's archive but not in
 NECIS's.
+
+NECIS event files carry only the KMA **KS** network. Add **`--kigam`** to also fetch the
+KIGAM **KG** network for the same events from [KIGAM Quake](https://quake.kigam.re.kr)'s FDSN
+service (origin −240 s … +360 s, the span NECIS files cover), so NECIS-era events get the KG
+stations STP-era events already have — including events NECIS itself does not list. It is
+opt-in because it changes a cluster's station set; `--augment` follows whatever the cluster's
+first run used. Needs a KIGAM open-API key (see [docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md#kigam-quake-key)).
 
 Given just a catalog CSV like
 
@@ -169,6 +176,7 @@ Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](d
 | `--python` | pure-Python backend (= `--loc-backend hyposvi --reloc-backend relocdd_py`) |
 | `--compare` | run Fortran **and** Python on the same picks → side-by-side `04_compare_<slug>.ipynb` |
 | `--source {necis\|stp\|mixed}` | waveform source (default `necis`; use `stp`/`mixed` for **pre-2020** events) |
+| `--kigam` | with `necis`/`mixed`: also fetch **KG** waveforms from KIGAM Quake for the NECIS events (networks KS+KG) |
 | `--skip-download` | reuse waveforms already on disk — skip the (slow) download stage |
 | `--skip-pipeline` | scaffold + download only (skip relocation + notebook) |
 | `--mainshock UTC_YYYYMMDDHHMMSS` | add Gwangyang-style mainshock treatment (builds a `_main` notebook) |
@@ -255,6 +263,7 @@ PocketQuake stays lean (~10 files); upstream fixes flow in via `git submodule up
 Beyond Python 3.10+:
 
 - **NECIS account** (`NECIS_USER` / `NECIS_PASS` in `.env`).
+- For `--kigam` only: a **KIGAM Quake open-API key** (`KIGAM_TOKEN` or `~/.config/kigam/openapi_token`).
 - **External binaries** on `PATH`: `hyp1.40`, `ncsn2pha`, `ph2dt`, `hypoDD`, `mseed2sac`.
 - **PhaseNet+ weights**: `EQNET_DIR` + `EQNET_WEIGHTS` env vars (see the eq-cycle README).
 - **SKHASH**: `SKHASH_DIR` env var (for focal mechanisms).

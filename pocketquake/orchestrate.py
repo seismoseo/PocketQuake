@@ -26,7 +26,7 @@ from typing import Iterable
 
 from pocketquake import EQCYCLE_DIR
 from pocketquake.scaffold import ClusterSpec, scaffold_all
-from pocketquake.necis_bridge import download_events
+from pocketquake.necis_bridge import download_events, download_kigam_events, record_sources
 from pocketquake.stp_bridge import download_events_via_stp
 from pocketquake import build_results_nb
 from pocketquake import source_dispatch
@@ -139,8 +139,17 @@ def _download_stp_for_cluster(cluster: str, *, networks: tuple[str, ...],
     download_events_via_stp(cfg, networks=networks)
 
 
+def _download_necis(catalog_csv: str, out_root: str, *, kigam: bool) -> None:
+    """NECIS (KS) for the events of `catalog_csv`, then KIGAM (KG) for the same events if asked."""
+    download_events(catalog_csv=catalog_csv, out_root=out_root, data_types=("a", "v"), convert_sac=True)
+    if kigam:
+        print(f"\n[pocketquake] adding KG from KIGAM Quake → {out_root}/<event>/KIGAM.{{v,a}}")
+        download_kigam_events(catalog_csv, out_root)
+
+
 def _download_mixed_for_cluster(cluster: str, *, spec, info: dict,
-                                catalog_csv: str, stp_cutoff: str | None) -> None:
+                                catalog_csv: str, stp_cutoff: str | None,
+                                kigam: bool = False) -> None:
     """Mixed-source orchestration: STP for the early subset, NECIS for the rest.
 
     Two modes:
@@ -170,8 +179,7 @@ def _download_mixed_for_cluster(cluster: str, *, spec, info: dict,
                                       catalog_csv_override=stp_sub_csv)
         if len(necis_df):
             print(f"\n[pocketquake] fetching {len(necis_df)} late events via NECIS → {necis_root}")
-            download_events(catalog_csv=necis_sub_csv, out_root=necis_root,
-                            data_types=("a", "v"), convert_sac=True)
+            _download_necis(necis_sub_csv, necis_root, kigam=kigam)
         return
 
     # Default mode: try STP over the full catalog, NECIS-fallback for events that came back empty.
@@ -182,8 +190,7 @@ def _download_mixed_for_cluster(cluster: str, *, spec, info: dict,
     print(f"\n[pocketquake] STP empty for {len(failed)} events — falling back to NECIS")
     if len(failed):
         source_dispatch.write_subset(failed, necis_sub_csv)
-        download_events(catalog_csv=necis_sub_csv, out_root=necis_root,
-                        data_types=("a", "v"), convert_sac=True)
+        _download_necis(necis_sub_csv, necis_root, kigam=kigam)
     else:
         print("  (every event got SACs from STP — no NECIS fetch needed)")
 
@@ -203,7 +210,8 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 skip_download: bool = False,
                 skip_pipeline: bool = False,
                 cores: int | None = None,
-                velmodel: str = "kim1983") -> dict:
+                velmodel: str = "kim1983",
+                kigam: bool = False) -> dict:
     """End-to-end: scaffold → waveform download → register → eq-cycle pipeline → results notebook.
 
     `wf_backend` picks the waveform source:
@@ -224,10 +232,24 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
       - `wf_backend="mixed"` → `("KS", "KG")` — the STP-half of the catalog gains KG just like
         a pure STP cluster; the NECIS-half is KS-only natively (NECIS event ZIPs do not bundle
         KG). The eq-cycle station table comes from STP so it's the historical-inclusive roster.
+      - `kigam=True` (necis / mixed) → `("KS", "KG")`: the events NECIS serves also get KG
+        waveforms from KIGAM Quake (`<event>/KIGAM.{v,a}/`, origin -240 s .. +360 s), so the
+        NECIS-era events gain the same KG coverage as STP-era ones. Opt-in because it changes
+        the station set, and so the results, of a cluster. Recorded in
+        `<src_root>/waveform_sources.json` so `--augment` fetches new events the same way.
 
     Returns paths/handles of the produced artifacts."""
+    if kigam and wf_backend == "stp":
+        print("[pocketquake] --kigam ignored: STP already serves KG for every event")
+        kigam = False
     if networks is None:
-        networks = ("KS",) if wf_backend == "necis" else ("KS", "KG")
+        networks = ("KS",) if (wf_backend == "necis" and not kigam) else ("KS", "KG")
+    elif kigam and "KG" not in networks:
+        raise SystemExit("[pocketquake] --kigam fetches KG waveforms but --networks has no KG: "
+                         "add KG to --networks or drop --kigam")
+    elif wf_backend == "necis" and "KG" in networks and not kigam:
+        print("[pocketquake] WARNING: KG is in --networks but NECIS serves no KG waveforms, so the "
+              "KG stations will have no data — add --kigam to fetch KG from KIGAM Quake")
     region = region or cluster.capitalize()
     spec = ClusterSpec(
         name=cluster, region=region, catalog_csv=catalog_csv,
@@ -249,8 +271,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
     print(f"[pocketquake] cluster scaffolded at {info['src_root']}")
     print(f"[pocketquake] cluster module:  {info['module']}")
     print(f"[pocketquake] config.py changes:  names={info['names_changed']}  src_dirs={info['src_dirs_changed']}")
+    record_sources(info["src_root"], kigam=kigam, networks=spec.networks)
     print(f"[pocketquake] wf_backend:     {wf_backend}"
-          + (f"  (stp_cutoff={stp_cutoff})" if wf_backend == "mixed" and stp_cutoff else ""))
+          + (f"  (stp_cutoff={stp_cutoff})" if wf_backend == "mixed" and stp_cutoff else "")
+          + ("  + KG from KIGAM Quake" if kigam else ""))
     print(f"[pocketquake] loc_backend:    {loc_backend}    reloc_backend:  {reloc_backend}")
 
     # 2. waveform download
@@ -262,11 +286,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         elif wf_backend == "mixed":
             _download_mixed_for_cluster(cluster, spec=spec, info=info,
                                         catalog_csv=catalog_in_cluster,
-                                        stp_cutoff=stp_cutoff)
+                                        stp_cutoff=stp_cutoff, kigam=kigam)
         else:
             print(f"\n[pocketquake] downloading waveforms via NECIS → {waveforms_dir}")
-            download_events(catalog_csv=catalog_in_cluster, out_root=waveforms_dir,
-                            data_types=("a", "v"), convert_sac=True)
+            _download_necis(catalog_in_cluster, waveforms_dir, kigam=kigam)
     else:
         print("[pocketquake] --skip-download set; assuming waveforms are already in place")
 
@@ -380,6 +403,12 @@ def main(argv: list[str] | None = None) -> None:
                          "stp (SNU SAC Transfer Protocol, older events) | "
                          "mixed (per-event dispatch; default try-STP-first with NECIS fallback, "
                          "or strict date split via --stp-cutoff)")
+    ap.add_argument("--kigam", action="store_true",
+                    help="Also fetch KG-network waveforms from KIGAM Quake (FDSN) for the events "
+                         "NECIS serves (--wf-backend necis or mixed), so they get KG stations like "
+                         "STP-era events do; implies --networks KS,KG. Needs the KIGAM open-API key "
+                         "(KIGAM_TOKEN or ~/.config/kigam/openapi_token) and, from an IP not "
+                         "registered with KIGAM, KIGAM_SSH_TUNNEL=user@host or KIGAM_PROXY")
     ap.add_argument("--stp-cutoff", default=None,
                     help="Only meaningful with --wf-backend=mixed. ISO date (e.g. 2024-10-01); "
                          "events with UTC origin ≥ this date skip STP and go straight to NECIS. "
@@ -401,9 +430,11 @@ def main(argv: list[str] | None = None) -> None:
         # events are downloaded/picked, then the whole cluster is re-relocated.
         bad = [f for f, v in (("--skip-pipeline", args.skip_pipeline),
                               ("--epicenter", args.epicenter),
-                              ("--region-bounds", args.region_bounds)) if v]
+                              ("--region-bounds", args.region_bounds),
+                              ("--kigam", args.kigam)) if v]
         if bad:
-            ap.error(f"--augment reuses the existing cluster config; drop {', '.join(bad)}")
+            ap.error(f"--augment reuses the existing cluster config (and its recorded waveform "
+                     f"sources); drop {', '.join(bad)}")
         from pocketquake import augment
         augment.augment_cluster(
             catalog_csv=args.catalog,
@@ -438,6 +469,7 @@ def main(argv: list[str] | None = None) -> None:
         skip_pipeline=args.skip_pipeline,
         cores=args.cores,
         velmodel=args.velmodel,
+        kigam=args.kigam,
     )
 
 

@@ -85,6 +85,13 @@ OPTIONS
   --stp-cutoff YYYY-MM-DD         only with --source mixed: events with UTC origin >= this date
                                   skip STP and go straight to NECIS (saves a failed STP round-trip
                                   per known-late event). Omit to use the try-then-fallback default.
+  --kigam                         with --source necis|mixed: also fetch KG-network waveforms from
+                                  KIGAM Quake (FDSN) for the events NECIS serves, so they get KG
+                                  stations like STP-era events do (implies networks KS,KG; changes
+                                  the station set, so it is opt-in). Needs the KIGAM open-API key
+                                  (KIGAM_TOKEN in .env or ~/.config/kigam/openapi_token) and, from an
+                                  IP not registered with KIGAM, KIGAM_SSH_TUNNEL=user@host in .env.
+                                  --augment follows the cluster's first run (no --kigam there).
   --mainshock UTC_YYYYMMDDHHMMSS  also run Gwangyang-style mainshock treatment after the
                                   default pipeline (re-runs xcorr→dtcc, builds a _main notebook)
   --mainshock-only                skip the default pipeline pass (it must already be complete)
@@ -132,7 +139,7 @@ hdr(){ echo; echo "▸ $*"; }
 CATALOG="$1"; SLUG="$2"; shift 2
 EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""; VELMODEL="kim1983"
 LOC_BACKEND="hypoinverse"; RELOC_BACKEND="hypodd"; LOC_SET=0; RELOC_SET=0; PYTHON_SHORTCUT=0; COMPARE=0
-SKIP_DOWNLOAD=0; SKIP_PIPELINE=0; AUGMENT=0; DRY_RUN=0
+SKIP_DOWNLOAD=0; SKIP_PIPELINE=0; AUGMENT=0; DRY_RUN=0; KIGAM=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
@@ -146,6 +153,7 @@ while [[ $# -gt 0 ]]; do
         --compare)         COMPARE=1; shift ;;
         --source)          SOURCE="$2"; shift 2 ;;
         --stp-cutoff)      STP_CUTOFF="$2"; shift 2 ;;
+        --kigam)           KIGAM=1; shift ;;
         --mainshock)       MAINSHOCK="$2"; shift 2 ;;
         --mainshock-only)  MAIN_ONLY=1; shift ;;
         --skip-download)   SKIP_DOWNLOAD=1; shift ;;
@@ -161,6 +169,8 @@ done
 [[ -n "$STP_CUTOFF" && "$SOURCE" != "mixed" ]] && fail "--stp-cutoff is only meaningful with --source mixed (got --source $SOURCE)"
 [[ "$MAIN_ONLY" == "1" && -z "$MAINSHOCK" ]] && fail "--mainshock-only requires --mainshock UTC_YYYYMMDDHHMMSS"
 [[ "$DRY_RUN" == "1" && "$AUGMENT" != "1" ]] && fail "--dry-run is only meaningful with --augment"
+[[ "$KIGAM" == "1" && "$SOURCE" == "stp" ]] && fail "--kigam adds KG to the events NECIS serves; --source stp already fetches KG"
+[[ "$KIGAM" == "1" && "$AUGMENT" == "1" ]] && fail "--augment follows the cluster's first run (recorded in waveform_sources.json) — drop --kigam"
 if [[ "$AUGMENT" == "1" ]]; then
     # Augment reuses the existing cluster's stored config (epicenter/bounds/backends/source);
     # the other run modes conflict with the incremental workflow.
@@ -222,6 +232,12 @@ case "$SOURCE" in
         ok "NECIS credentials loaded ($NECIS_USER)"
         ;;
 esac
+if [[ "$KIGAM" == "1" ]]; then
+    KIGAM_KEY_FILE="${KIGAM_TOKEN_FILE:-$HOME/.config/kigam/openapi_token}"
+    [[ -n "${KIGAM_TOKEN:-}" || -s "$KIGAM_KEY_FILE" ]] || \
+        fail "--kigam needs the KIGAM open-API key: KIGAM_TOKEN in .env or the file $KIGAM_KEY_FILE (chmod 600)"
+    ok "KIGAM key found${KIGAM_SSH_TUNNEL:+ (requests via SSH tunnel to $KIGAM_SSH_TUNNEL)}"
+fi
 
 # ---- Python relocation-backend preflight (opt-in; default Fortran path skips these) ----
 # --compare also needs the Python backends (it re-runs pp on the same picks).
@@ -308,6 +324,7 @@ else
     ok "loc-backend: $LOC_BACKEND"
     ok "reloc-bcknd: $RELOC_BACKEND"
     ok "source:      $SOURCE"
+    [[ "$KIGAM" == "1" ]] && ok "kigam:       KG waveforms from KIGAM Quake for the NECIS events"
 fi
 ok "picker:      $PICKER"
 [[ -n "$STP_CUTOFF" ]] && ok "stp-cutoff:  $STP_CUTOFF (events >= this date skip STP)"
@@ -336,6 +353,7 @@ else
         --reloc-backend "$RELOC_BACKEND"
     )
     [[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
+    [[ "$KIGAM" == "1"      ]] && CMD+=(--kigam)
     [[ "$SKIP_PIPELINE" == "1" ]] && CMD+=(--skip-pipeline)
 fi
 [[ -n "$CORES"          ]] && CMD+=(--cores "$CORES")

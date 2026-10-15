@@ -161,6 +161,27 @@ echo "STP_CMD=/opt/perl/5.38/bin/perl /path/to/stp-client.pl" >> .env
 
 ---
 
+## KIGAM Quake key
+
+Only required for `--kigam`, which adds the KIGAM **KG** network to the events NECIS serves
+(NECIS event files carry KS only). KIGAM Quake (<https://quake.kigam.re.kr>) serves KG through
+standard FDSN `station`/`dataselect` services; access needs a Geo Big Data Open Platform
+**open-API key**, which KIGAM accepts **only from the IP addresses registered with it**.
+
+```bash
+# the key: a private file (or KIGAM_TOKEN=... in .env)
+mkdir -p ~/.config/kigam && read -rs K && printf '%s' "$K" > ~/.config/kigam/openapi_token \
+  && chmod 600 ~/.config/kigam/openapi_token; unset K
+# on a machine whose IP is NOT registered: route through one that is (key-based SSH)
+echo "KIGAM_SSH_TUNNEL=user@registered-host" >> .env     # or KIGAM_PROXY=socks5h://host:port
+```
+
+A request from an unregistered address fails with `401 Authentication failed (SSO result: 400)`.
+KIGAM publishes data about three days late, so very recent events have no KG yet; re-run with
+`--augment` later.
+
+---
+
 ## Python relocation backends (optional — a Fortran-free pipeline)
 
 The default chain uses the compiled Fortran tools (`hyp1.40`, `ph2dt` + `hypoDD`).
