@@ -16,6 +16,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VER="$(git -C "$ROOT" describe --tags --always)"
 OUT="${1:-$ROOT/PocketQuake-$VER-full-source.zip}"
+# absolute, because zip runs from inside $STAGE: a relative name (as the release workflow passes)
+# would land in the staging dir and be deleted with it, so the upload step found no file
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
