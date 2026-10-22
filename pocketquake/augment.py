@@ -160,12 +160,20 @@ def _preflight(cfg, cluster: str, velmodel: str, picker: str) -> None:
 
 
 # --------------------------------------------------------------- downloads
-def _download_new(cfg, cluster: str, subset_csv: str) -> None:
+def _download_new(cfg, cluster: str, subset_csv: str, fetcher=None) -> None:
     """Fetch waveforms for the new events only, honoring the cluster's wf_source and its
-    recorded KIGAM choice (waveform_sources.json), so new events get the same networks."""
+    recorded KIGAM choice / external fetcher (waveform_sources.json), so new events get the
+    same networks and source as the existing ones."""
     from pocketquake.orchestrate import _download_stp_for_cluster, _download_necis
-    from pocketquake.necis_bridge import kigam_enabled
+    from pocketquake.necis_bridge import kigam_enabled, source_backend
     src_root = cfg.src_root
+    backend = source_backend(src_root)
+    if backend:                                        # built by an external package (e.g. FDSN)
+        if fetcher is None:
+            raise SystemExit(f"[augment] {cluster} was built with the '{backend}' fetcher — "
+                             f"augment it with that package (it passes its fetcher)")
+        fetcher(subset_csv, os.path.join(src_root, "kma_waveforms"))
+        return
     kigam = kigam_enabled(src_root)
     networks = ("KS",) if (cfg.wf_source == "kma_archive" and not kigam) else ("KS", "KG")
     if kigam:
@@ -191,7 +199,8 @@ def augment_cluster(catalog_csv: str, cluster: str, *,
                     cores: int | None = None,
                     run_focal_mechanism: bool = True,
                     skip_download: bool = False,
-                    dry_run: bool = False) -> dict:
+                    dry_run: bool = False,
+                    fetcher=None) -> dict:
     """Add the new events of `catalog_csv` to the processed cluster and re-relocate all."""
     from pocketquake.orchestrate import _run_eqcycle_stage, _execute_notebook
     from pocketquake import build_results_nb
@@ -237,7 +246,7 @@ def augment_cluster(catalog_csv: str, cluster: str, *,
         print("[augment] --skip-download set; assuming new-event waveforms are in place")
     else:
         print(f"\n[augment] downloading {n_new} new events ({cfg.wf_source})")
-        _download_new(cfg, cluster, subset_csv)
+        _download_new(cfg, cluster, subset_csv, fetcher=fetcher)
 
     # 6b. availability check: very recent events may not be served yet (e.g. NECIS's
     # processing delay). Proceed with what arrived; pending events are retried simply by

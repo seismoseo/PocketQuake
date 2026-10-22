@@ -211,7 +211,9 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 skip_pipeline: bool = False,
                 cores: int | None = None,
                 velmodel: str = "kim1983",
-                kigam: bool = False) -> dict:
+                kigam: bool = False,
+                fetcher=None,
+                spec_extra: dict | None = None) -> dict:
     """End-to-end: scaffold → waveform download → register → eq-cycle pipeline → results notebook.
 
     `wf_backend` picks the waveform source:
@@ -238,11 +240,20 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         the station set, and so the results, of a cluster. Recorded in
         `<src_root>/waveform_sources.json` so `--augment` fetches new events the same way.
 
+    `wf_backend="external"` (PocketQuake-global): `fetcher(catalog_csv, waveforms_dir)` fills
+    `kma_waveforms/`; `spec_extra` carries the ClusterSpec fields that supply the station tables and
+    the cluster factory (station_tables_fn, station_master_files, factory, factory_imports,
+    factory_args). Everything after the download is the same pipeline as the domestic backends.
+
     Returns paths/handles of the produced artifacts."""
+    if wf_backend == "external" and fetcher is None:
+        raise SystemExit("[pocketquake] wf_backend='external' needs a fetcher(catalog_csv, waveforms_dir)")
     if kigam and wf_backend == "stp":
         print("[pocketquake] --kigam ignored: STP already serves KG for every event")
         kigam = False
-    if networks is None:
+    if wf_backend == "external":
+        networks = tuple(networks or ())                 # the fetcher's station tables decide
+    elif networks is None:
         networks = ("KS",) if (wf_backend == "necis" and not kigam) else ("KS", "KG")
     elif kigam and "KG" not in networks:
         raise SystemExit("[pocketquake] --kigam fetches KG waveforms but --networks has no KG: "
@@ -255,7 +266,7 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         name=cluster, region=region, catalog_csv=catalog_csv,
         epicenter=tuple(epicenter), region_bounds=tuple(region_bounds),
         networks=tuple(networks), dtct_isolv=dtct_isolv, wf_backend=wf_backend,
-        loc_backend=loc_backend, reloc_backend=reloc_backend,
+        loc_backend=loc_backend, reloc_backend=reloc_backend, **(spec_extra or {}),
     )
 
     # 1. scaffold + register (idempotent)
@@ -271,7 +282,8 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
     print(f"[pocketquake] cluster scaffolded at {info['src_root']}")
     print(f"[pocketquake] cluster module:  {info['module']}")
     print(f"[pocketquake] config.py changes:  names={info['names_changed']}  src_dirs={info['src_dirs_changed']}")
-    record_sources(info["src_root"], kigam=kigam, networks=spec.networks)
+    record_sources(info["src_root"], kigam=kigam, networks=spec.networks,
+                   backend=(getattr(fetcher, "backend_name", None) or "external") if wf_backend == "external" else None)
     print(f"[pocketquake] wf_backend:     {wf_backend}"
           + (f"  (stp_cutoff={stp_cutoff})" if wf_backend == "mixed" and stp_cutoff else "")
           + ("  + KG from KIGAM Quake" if kigam else ""))
@@ -287,6 +299,9 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
             _download_mixed_for_cluster(cluster, spec=spec, info=info,
                                         catalog_csv=catalog_in_cluster,
                                         stp_cutoff=stp_cutoff, kigam=kigam)
+        elif wf_backend == "external":
+            print(f"\n[pocketquake] downloading waveforms via {getattr(fetcher, 'backend_name', 'external fetcher')} → {waveforms_dir}")
+            fetcher(catalog_in_cluster, waveforms_dir)
         else:
             print(f"\n[pocketquake] downloading waveforms via NECIS → {waveforms_dir}")
             _download_necis(catalog_in_cluster, waveforms_dir, kigam=kigam)

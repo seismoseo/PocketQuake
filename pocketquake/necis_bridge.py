@@ -73,12 +73,26 @@ def download_kigam_events(catalog_csv: str, out_root: str, data_types=("a", "v")
                                   convert_sac=convert_sac, groups=KIGAM_GROUPS)
 
 
-def record_sources(src_root: str, *, kigam: bool, networks) -> None:
+def record_sources(src_root: str, *, kigam: bool, networks, backend: str | None = None) -> None:
     """Record how the cluster's waveforms were fetched, so `--augment` fetches new events the
-    same way (a cluster must not mix events with and without KG stations)."""
+    same way (a cluster must not mix events with and without KG stations). `backend` names an
+    external fetcher (e.g. PocketQuake-global's FDSN one)."""
     import json
+    rec = {"kigam": bool(kigam), "networks": list(networks)}
+    if backend:
+        rec["backend"] = backend
     with open(os.path.join(src_root, SOURCES_JSON), "w") as fh:
-        json.dump({"kigam": bool(kigam), "networks": list(networks)}, fh, indent=1)
+        json.dump(rec, fh, indent=1)
+
+
+def source_backend(src_root: str) -> str | None:
+    """The external fetcher a cluster was built with (None for NECIS/STP/mixed clusters)."""
+    import json
+    p = os.path.join(src_root, SOURCES_JSON)
+    if not os.path.exists(p):
+        return None
+    with open(p) as fh:
+        return json.load(fh).get("backend")
 
 
 def kigam_enabled(src_root: str) -> bool:

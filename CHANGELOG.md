@@ -3,6 +3,48 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.16.0 — 2026-10-23
+
+**Changed** (`external/korea-cluster-relocation` → d067985)
+- **GPU cross-correlation is ~70× faster, with identical results.** The `cctorch_gpu_batched`
+  backend now sends each correlation only the few seconds of trace around the two picks and
+  builds the shifted windows on the GPU, instead of reloading whole traces and stacking 1000
+  windows per correlation in memory. The dt.cc files are byte-identical to the previous GPU code
+  and to the ObsPy CPU path (checked file by file on donghae, 2019_changnyeong and a 30-event
+  San Ramon test). Host memory falls from 8–30 GB to about 1 GB. The GPU needs a PyTorch build
+  that supports the card (e.g. cu128 for RTX Blackwell); otherwise the CPU path runs as before.
+  `XCORR_GPU_IMPL=legacy` selects the previous code.
+- **HypoDD now relocates with the layers of the velocity model you locate with.** Before,
+  `--velmodel kim2011` located with Kim2011 in HYPOINVERSE but relocated with Kim1983 layers in
+  HypoDD. kim2011 runs therefore change; kim1983 runs (the default) do not.
+- **Stations are told apart by network and code.** KS.CHS and KG.CHS are different stations
+  about 23 km apart; picking, HYPOINVERSE and the relocation now keep them separate. HYPOINVERSE
+  also matches the full 5-letter code plus network (`LET 5 2 0 0 0`): its default matched only
+  the first 4 letters, which treated KG POHM2/3/5/7 as one station. No existing cluster we reran
+  changes; a cluster with data from both CHS stations, or several POHM stations, now locates
+  with each at its own position.
+- **Split NECIS channels**: when an event archive delivers one channel as several segments, the
+  segment covering the origin is kept (before, the last one could overwrite it and the station
+  dropped out).
+
+**Added**
+- Hooks for other waveform sources, used by PocketQuake-global (FDSN data anywhere):
+  `orchestrate(wf_backend="external", fetcher=..., spec_extra=...)`, `POCKETQUAKE_EQCYCLE_DIR`
+  for another pipeline checkout, and `--augment` following a cluster's recorded source. The
+  pipeline also reads UTC catalogs and any-hemisphere coordinates.
+
+**Fixed**
+- The results notebook is written into the pipeline checkout the run uses, and its magnitude
+  wording follows the cluster's catalog magnitude.
+
+**Verified**: 2019_changnyeong and donghae re-gathered from raw and run from picking through the
+dt.cc relocation with v1.15.0's and this release's pipeline in the same environment: all 72 and
+498 location/relocation files byte-identical (every .sum, .arc, dt.ct, dt.cc pair file,
+hypoDD.inp and hypoDD.reloc).
+
+**Note**: PhaseNet+ picks can differ slightly between PyTorch versions (5 of 965 picks on
+donghae between PyTorch 2.6 and 2.11), so keep one environment for a cluster's whole run.
+
 ## 1.15.0 — 2026-10-15
 
 **Added**

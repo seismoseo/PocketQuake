@@ -13,7 +13,7 @@ import os
 import re
 import shutil
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Callable, Iterable
 
 import pandas as pd
 
@@ -36,6 +36,14 @@ class ClusterSpec:
                                              # "stp"  (SAC Transfer Protocol via SNU, older events)
     loc_backend: str = "hypoinverse"         # "hypoinverse" (Fortran hyp1.40, default) | "hyposvi" (Python)
     reloc_backend: str = "hypodd"            # "hypodd" (Fortran ph2dt+hypoDD, default) | "relocdd_py" (Python)
+    # wf_backend="external" (e.g. PocketQuake-global): the caller writes the station tables and picks
+    # the cluster factory. station_tables_fn(station_table_dir) writes `station_master_files` there;
+    # the module calls `factory(..., <factory_args>)`, importing `factory_imports` from _base too.
+    station_tables_fn: Callable[[str], None] | None = None
+    station_master_files: tuple[str, ...] = ()
+    factory: str | None = None
+    factory_imports: tuple[str, ...] = ()
+    factory_args: str = ""
 
     @property
     def src_dir(self) -> str:
@@ -96,7 +104,9 @@ def scaffold(spec: ClusterSpec) -> str:
     shutil.copyfile(spec.catalog_csv, dst_catalog)
 
     # 3. emit per-network station tables in the eq-cycle format
-    if spec.wf_backend in ("stp", "mixed"):
+    if spec.station_tables_fn is not None:                       # external backend writes its own
+        spec.station_tables_fn(os.path.join(src_root, "station_table"))
+    elif spec.wf_backend in ("stp", "mixed"):
         # Pull the historical-inclusive roster from STP directly. Required for the mixed
         # case too because the STP-half of the catalog may reference stations retired
         # before NECIS's modern bundle was assembled.
@@ -129,6 +139,12 @@ def write_cluster_module(spec: ClusterSpec) -> str:
     factory = {"stp": "stp_cluster",
                "mixed": "mixed_cluster",
                "necis": "kma_cluster"}.get(spec.wf_backend, "kma_cluster")
+    if spec.factory:                                             # external backend's own factory
+        factory = spec.factory
+    if spec.station_master_files:
+        nets_repr = ", ".join(f'"{f}"' for f in spec.station_master_files)
+    imports = ", ".join((factory, *spec.factory_imports))
+    extra_args = f"\n    {spec.factory_args.strip().rstrip(',')}," if spec.factory_args.strip() else ""
     # Opt-in Python relocation backends (default Fortran path emits nothing here, so
     # existing generated modules stay byte-identical). Tool paths / EikoNet weights are
     # resolved from env (RELOCDD_PY_DIR / HYPOSVI_EIKONET_P/S) by the backend adapters,
@@ -143,7 +159,7 @@ from dataclasses import replace
 import os
 
 from pipeline import config
-from pipeline.clusters._base import {factory}
+from pipeline.clusters._base import {imports}
 
 
 CONFIG = {factory}(
@@ -153,7 +169,7 @@ CONFIG = {factory}(
     epicenter=({epi_lat}, {epi_lon}),
     region_bounds=({rb}),
     station_masters=({nets_repr},),
-    dtct_isolv={spec.dtct_isolv},
+    dtct_isolv={spec.dtct_isolv},{extra_args}
 )
 
 # AI-pick-probability HypoInverse weighting (PocketQuake v1.0.0+ default).

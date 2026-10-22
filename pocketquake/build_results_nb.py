@@ -413,16 +413,36 @@ md(r"""## 8. Interpretation
 
 import os, sys, argparse
 
-# Default destination: the eq-cycle submodule's notebooks dir, resolved relative to PocketQuake root
-# (this file lives at PocketQuake/pocketquake/build_results_nb.py).
-_PQ_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-_DEFAULT_OUT = os.path.join(_PQ_ROOT, "external", "korea-cluster-relocation",
-                            "pipeline", "notebooks")
+# Default destination: the notebooks dir of the eq-cycle checkout PocketQuake runs (EQCYCLE_DIR:
+# the bundled submodule, or POCKETQUAKE_EQCYCLE_DIR). The notebook imports `pipeline` from two
+# levels above itself, so it must sit in the same checkout as the run.
+from pocketquake import EQCYCLE_DIR as _EQCYCLE_DIR
+_DEFAULT_OUT = os.path.join(_EQCYCLE_DIR, "pipeline", "notebooks")
+
+
+def _magnitude_label(cluster: str) -> str:
+    """What the cluster's catalog magnitude is (cfg.magnitude_label; KMA clusters: KMA local magnitude)."""
+    import sys
+    from pocketquake import EQCYCLE_DIR
+    if EQCYCLE_DIR not in sys.path:
+        sys.path.insert(0, EQCYCLE_DIR)
+    try:
+        from pipeline import config as _pc
+        return getattr(_pc.load_cluster(cluster), "magnitude_label", "KMA local magnitude")
+    except Exception:                                  # noqa: BLE001 — wording only
+        return "KMA local magnitude"
 
 
 def build(cluster: str, out_dir: str = _DEFAULT_OUT, velmodel: str = "kim1983") -> str:
     """Write 03_results_<cluster>.ipynb under `out_dir` and return the path. `velmodel` sets
     which velocity model's .sum / relocation / mechanisms the notebook reads (default kim1983)."""
+    label = _magnitude_label(cluster)
+    for c in C:
+        if c.cell_type == "markdown" and "KMA local magnitude" in c.source:
+            c.source = c.source.replace("KMA local magnitude", label)
+        if (c.cell_type == "markdown" and label != "KMA local magnitude"
+                and "KMA local `magnitude`" in c.source):           # the table column's wording
+            c.source = c.source.replace("KMA local `magnitude`", f"{label} (`magnitude`)")
     for c in C:                                   # inject the cluster name + clear the eq-cycle's
         if c.cell_type == "code" and 'CLUSTER    = "gwangyang"' in c.source:   # _pnplus suffix
             c.source = c.source.replace('CLUSTER    = "gwangyang"', f'CLUSTER    = "{cluster}"')

@@ -16,16 +16,17 @@ Workflow (see `pocketquake.orchestrate.orchestrate`):
         → build & execute `03_results_<cluster>.ipynb`
 """
 
-__version__ = "1.15.0"            # single source of truth — pyproject.toml reads this via setuptools dynamic
+__version__ = "1.16.0"            # single source of truth — pyproject.toml reads this via setuptools dynamic
 
 import os
 
 # Repository root (the directory that contains this `pocketquake/` package).
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
-# Submodule paths
+# Submodule paths. POCKETQUAKE_EQCYCLE_DIR points PocketQuake at another checkout of the relocation
+# pipeline (PocketQuake-global uses its own and never needs necis-downloader).
 NECIS_DIR = os.path.join(ROOT, "external", "necis-downloader")
-EQCYCLE_DIR = os.path.join(ROOT, "external", "korea-cluster-relocation")
+EQCYCLE_DIR = os.environ.get("POCKETQUAKE_EQCYCLE_DIR") or os.path.join(ROOT, "external", "korea-cluster-relocation")
 
 # Bundled assets
 STATIONS_KP = os.path.join(ROOT, "stations", "KP_station_list.csv")
