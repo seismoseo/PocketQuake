@@ -60,7 +60,7 @@ that's **117 stations vs 57 from the modern roster — twice the picks available
 
 ```bash
 cd PocketQuake
-# .env needs STP_USER=sgtlab and STP_PASS=sgtlab1827 (in addition to NECIS_USER/PASS)
+# .env needs STP_USER and STP_PASS (your personal STP account from the lab) in addition to NECIS_USER/PASS
 ./pocketquake.sh sangju_catalog.csv sangju --source stp --fg
 ```
 

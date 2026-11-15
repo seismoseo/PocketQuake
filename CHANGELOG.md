@@ -3,6 +3,13 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.16.1 — 2026-11-15
+
+**Security**
+- Removed a shared STP login that an example README (`examples/sangju/README.md`) showed in plain text since
+  v1.1.0. The README now says to put your own STP account in `.env`. The exposed password has been retired by
+  the lab; code and results are unchanged (`external/korea-cluster-relocation` stays at d067985).
+
 ## 1.16.0 — 2026-10-23
 
 **Changed** (`external/korea-cluster-relocation` → d067985)
