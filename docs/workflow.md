@@ -83,6 +83,14 @@ Stage order: `stations → waveforms → picking → hypoinverse → ph2dt → d
 
 The `xcorr` stage defaults to the `cctorch_gpu_batched` backend — a GPU FFT cross-correlation that is bit-exact to the obspy CPU baseline and **auto-falls-back to obspy** when no usable CUDA GPU is present (so CPU-only runs are unaffected). Pick the kernel with `--xcorr-backend` / `cfg.xcorr_backend`.
 
+S correlation normally chooses the better of N and E. With `--s-on-t`, the xcorr stage
+derives R/T from the original horizontal records and measures S exclusively on T; P
+remains on Z. `--orientation-csv` also enables T and selects each sensor's correction at
+the event's UTC origin time. Repairs and the correction precede rotation; an optional
+`--rotation-reference LAT,LON` supplies one source point for the sequence. These settings
+are recorded with the run and checked before reusing correlation pairs. See
+[Orientation and S on T](orientation.md) for the CSV schema and rerun procedure.
+
 !!! note "Automatic anti-aliasing at the `picking` stage (v1.12.0)"
     PhaseNet+ runs at 100 Hz. For stations recorded **above** 100 Hz (e.g. 200 Hz KMA/KG stations, or 250 Hz nodal/geophone arrays), PocketQuake now applies a proper anti-alias lowpass — demean → taper → **zero-phase** Butterworth lowpass at 45 Hz (0.9 × the new 50 Hz Nyquist) → resample — **before** the trace reaches the picker. Without it, the underlying EQNet reader down-samples with plain linear interpolation and no lowpass, folding any >50 Hz energy back onto the P/S onsets (aliasing), which distorts pick times and first-motion polarity. The guard fires **only when the native rate exceeds 100 Hz**: 100 Hz archive data passes through byte-identical, and up-sampling (e.g. 40 Hz → 100 Hz) is alias-free and untouched. Zero-phase filtering keeps onset times in place — a causal lowpass would bias picks late. See `pipeline.core.eqnet_backend` (`_antialias_resample`).
 

@@ -27,6 +27,12 @@ stations STP-era events already have — including events NECIS itself does not 
 opt-in because it changes a cluster's station set; `--augment` follows whatever the cluster's
 first run used. Needs a KIGAM open-API key (see [docs/EXTERNAL_TOOLS.md](docs/EXTERNAL_TOOLS.md#kigam-quake-key)).
 
+For sensors whose horizontal orientation changes over time, pass
+**`--orientation-csv orientation.csv`** to apply per-event corrections and correlate S on
+the transverse component T, following the Haenam workflow. P stays on Z; the default S
+measurement remains best-of-N/E. See [orientation and S-on-T guide](docs/orientation.md)
+for epoch tables, wiring repairs, shared rotation references, and existing-run updates.
+
 Given just a catalog CSV like
 
 ```
@@ -184,6 +190,10 @@ Errors during a fresh-clone smoke test are mapped in [docs/TROUBLESHOOTING.md](d
 | `--picker {phasenet_plus\|stead}` | picker model (default `phasenet_plus`; `stead` needs no EQNet) |
 | `--velmodel {kim1983\|kim2011}` | velocity model for relocation + focal mechanisms + notebook (default kim1983) |
 | `--cores N` | cap xcorr workers (default per-cluster, ~10; lower it on small-RAM boxes) |
+| `--s-on-t` | correlate S exclusively on T using nominal orientation unless a table is supplied; P stays on Z |
+| `--orientation-csv PATH` | time-dependent sensor corrections; implies `--s-on-t` ([table format](docs/orientation.md)) |
+| `--orientation-missing {error\|zero\|skip}` | missing table epoch: stop (default), warn and use 0°, or omit T |
+| `--rotation-reference LAT,LON` | fixed source point for rotation; default: each event's coordinates |
 | `--epi LAT,LON` · `--bounds LAT0,LAT1,LON0,LON1` | override the auto-derived epicenter / region |
 | `--fg` | run in the foreground (default: background via `nohup`, logs to `<slug>_run.log`) |
 

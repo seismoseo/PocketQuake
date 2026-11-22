@@ -3,7 +3,7 @@
 **From an event-catalog CSV to a relocation-summary notebook in one command.**
 
 !!! info inline end "Version"
-    **v1.16.1** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
+    **v1.17.0** &middot; [Changelog](https://github.com/seismoseo/PocketQuake/blob/main/CHANGELOG.md) &middot; [Releases](https://github.com/seismoseo/PocketQuake/releases)
 
 PocketQuake glues two projects into a single reproducible workflow for Korean earthquake sequences:
 
@@ -43,6 +43,7 @@ See [Two relocation modes](relocation-modes.md).
 - :material-rocket-launch: **[Quickstart](quickstart.md)** — install and run the chungju example
 - :material-cog: **[Installation](INSTALL.md)** — environment, externals, accounts
 - :material-console: **[CLI reference](cli.md)** — every `pocketquake.sh` option
+- :material-compass: **[Orientation and S on T](orientation.md)** — sensor epochs, rotation, and transverse S correlation
 - :material-language-python: **[Python backend](python-backend.md)** — the Fortran-free path
 - :material-wrench: **[Troubleshooting](TROUBLESHOOTING.md)** — fresh-clone error map
 

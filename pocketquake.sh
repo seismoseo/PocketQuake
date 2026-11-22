@@ -110,6 +110,10 @@ OPTIONS
   --cores N                       cap xcorr workers (forwarded to the eq-cycle CLI's --cores;
                                   default: each cluster's cfg.num_cores, typically 10). Set lower
                                   on memory-constrained boxes (~24 GB/worker observed).
+  --s-on-t                        correlate S exclusively on rotated transverse T (P stays on Z)
+  --orientation-csv PATH          time-dependent sensor corrections; implies --s-on-t
+  --orientation-missing POLICY    error (default), zero, or skip for missing table epochs
+  --rotation-reference LAT,LON    fixed source point for rotation (default: each event)
   --fg                            run in foreground (default: nohup background)
   -h, --help                      show this and exit
 
@@ -140,6 +144,7 @@ CATALOG="$1"; SLUG="$2"; shift 2
 EPI=""; BBOX=""; PICKER="phasenet_plus"; MAINSHOCK=""; FG=0; SOURCE="necis"; MAIN_ONLY=0; CORES=""; STP_CUTOFF=""; VELMODEL="kim1983"
 LOC_BACKEND="hypoinverse"; RELOC_BACKEND="hypodd"; LOC_SET=0; RELOC_SET=0; PYTHON_SHORTCUT=0; COMPARE=0
 SKIP_DOWNLOAD=0; SKIP_PIPELINE=0; AUGMENT=0; DRY_RUN=0; KIGAM=0
+S_ON_T=0; ORIENTATION_CSV=""; ORIENTATION_MISSING=""; ROTATION_REFERENCE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epi)             EPI="$2"; shift 2 ;;
@@ -160,6 +165,10 @@ while [[ $# -gt 0 ]]; do
         --skip-pipeline)   SKIP_PIPELINE=1; shift ;;
         --cores)           CORES="$2"; shift 2 ;;
         --velmodel)        VELMODEL="$2"; shift 2 ;;
+        --s-on-t)          S_ON_T=1; shift ;;
+        --orientation-csv) [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || fail "--orientation-csv needs a path"; ORIENTATION_CSV="$2"; S_ON_T=1; shift 2 ;;
+        --orientation-missing) [[ $# -ge 2 ]] || fail "--orientation-missing needs error, zero, or skip"; ORIENTATION_MISSING="$2"; shift 2 ;;
+        --rotation-reference) [[ $# -ge 2 ]] || fail "--rotation-reference needs LAT,LON"; ROTATION_REFERENCE="$2"; shift 2 ;;
         --fg|--foreground) FG=1; shift ;;
         -h|--help)         usage 0 ;;
         *) fail "unknown option: $1" ;;
@@ -171,6 +180,10 @@ done
 [[ "$DRY_RUN" == "1" && "$AUGMENT" != "1" ]] && fail "--dry-run is only meaningful with --augment"
 [[ "$KIGAM" == "1" && "$SOURCE" == "stp" ]] && fail "--kigam adds KG to the events NECIS serves; --source stp already fetches KG"
 [[ "$KIGAM" == "1" && "$AUGMENT" == "1" ]] && fail "--augment follows the cluster's first run (recorded in waveform_sources.json) — drop --kigam"
+[[ -z "$ORIENTATION_MISSING" || "$ORIENTATION_MISSING" == "error" || "$ORIENTATION_MISSING" == "zero" || "$ORIENTATION_MISSING" == "skip" ]] || fail "--orientation-missing must be error, zero, or skip"
+[[ -z "$ORIENTATION_CSV" || -f "$ORIENTATION_CSV" ]] || fail "orientation CSV not found: $ORIENTATION_CSV"
+[[ "$S_ON_T" == "1" || ( -z "$ROTATION_REFERENCE" && -z "$ORIENTATION_MISSING" ) ]] || fail "orientation settings require --s-on-t or --orientation-csv"
+[[ "$MAIN_ONLY" != "1" || ( "$S_ON_T" != "1" && -z "$ROTATION_REFERENCE" && -z "$ORIENTATION_MISSING" ) ]] || fail "--mainshock-only reuses the stored orientation config; rerun xcorr first to change it"
 if [[ "$AUGMENT" == "1" ]]; then
     # Augment reuses the existing cluster's stored config (epicenter/bounds/backends/source);
     # the other run modes conflict with the incremental workflow.
@@ -179,6 +192,7 @@ if [[ "$AUGMENT" == "1" ]]; then
     [[ "$COMPARE" == "1" || "$PYTHON_SHORTCUT" == "1" || "$LOC_SET" == "1" || "$RELOC_SET" == "1" ]] && \
         fail "--augment reuses the cluster's stored backends — drop --compare/--python/--loc-backend/--reloc-backend"
     [[ "$SKIP_PIPELINE" == "1" ]] && fail "--augment needs the pipeline stages; drop --skip-pipeline"
+    [[ "$S_ON_T" == "1" || -n "$ROTATION_REFERENCE" || -n "$ORIENTATION_MISSING" ]] && fail "--augment reuses stored orientation settings; change the cluster config and remeasure all pairs first"
 fi
 # --python = pure-Python backends shortcut (= --loc-backend hyposvi --reloc-backend relocdd_py)
 if [[ "$PYTHON_SHORTCUT" == "1" ]]; then
@@ -355,6 +369,14 @@ else
     [[ -n "$STP_CUTOFF"     ]] && CMD+=(--stp-cutoff "$STP_CUTOFF")
     [[ "$KIGAM" == "1"      ]] && CMD+=(--kigam)
     [[ "$SKIP_PIPELINE" == "1" ]] && CMD+=(--skip-pipeline)
+    [[ "$S_ON_T" == "1" ]] && CMD+=(--s-on-t)
+    # The command runs after cd to HERE, so resolve a caller-relative table path now.
+    if [[ -n "$ORIENTATION_CSV" ]]; then
+        ORIENTATION_CSV="$(cd "$(dirname "$ORIENTATION_CSV")" && pwd)/$(basename "$ORIENTATION_CSV")"
+        CMD+=(--orientation-csv "$ORIENTATION_CSV")
+    fi
+    [[ -n "$ORIENTATION_MISSING" ]] && CMD+=(--orientation-missing "$ORIENTATION_MISSING")
+    [[ -n "$ROTATION_REFERENCE" ]] && CMD+=("--rotation-reference=$ROTATION_REFERENCE")
 fi
 [[ -n "$CORES"          ]] && CMD+=(--cores "$CORES")
 [[ -n "$VELMODEL"       ]] && CMD+=(--velmodel "$VELMODEL")

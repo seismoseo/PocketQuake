@@ -1,21 +1,19 @@
 # PocketQuake Beamer tutorial
 
-A 12-slide self-contained walkthrough from a fresh clone to the executed
+A self-contained walkthrough from a fresh clone to the executed
 results notebook. Aimed at first-time users.
 
 ## Build the PDF
 
-### Locally (you have LaTeX installed)
+### Locally (tectonic)
 
 ```bash
 cd docs/tutorial
-pdflatex pocketquake_tutorial.tex   # twice for refs / toc
-pdflatex pocketquake_tutorial.tex
+tectonic pocketquake_tutorial.tex
 ```
 
-Beamer + Metropolis theme are required. Most TeX Live distributions ship
-both; `texlive-latex-extra` and `texlive-fonts-extra` cover any missing
-bits.
+Tectonic fetches the required Beamer, Metropolis, and font packages on the first build.
+The canonical output is `pocketquake_tutorial.pdf`, linked from the documentation home.
 
 ### On Overleaf (no local LaTeX)
 
