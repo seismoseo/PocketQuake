@@ -1,5 +1,5 @@
 % PocketQuake tutorial — Beamer presentation
-% Compile with: pdflatex (or xelatex / lualatex) pocketquake_tutorial.tex
+% Compile with: tectonic pocketquake_tutorial.tex
 %
 % The tutorial guides a first-time user from a fresh clone to the executed
 % results notebook of the bundled chungju example. Concise but self-contained:
@@ -31,7 +31,7 @@
 }
 
 % Keep \pqversion in sync with pocketquake.__version__ (single source of truth).
-\newcommand{\pqversion}{1.16.0}
+\newcommand{\pqversion}{1.17.0}
 \title{PocketQuake}
 \subtitle{From a catalog CSV to a relocation notebook in one command}
 \author{Min-Seong Seo / SGTL, SNU}
@@ -199,6 +199,49 @@ Useful flags:
   \item \texttt{--mainshock <UTC>} --- Gwangyang-style mainshock treatment
   \item \texttt{--cores N} --- cap xcorr workers (default 10)
   \item \texttt{--xcorr-backend} --- dt.cc xcorr kernel (default \texttt{cctorch\_gpu\_batched}, a bit-exact GPU FFT backend that auto-falls-back to obspy without a GPU)
+\end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------- time-dependent orientation
+\begin{frame}[fragile]{Time-dependent orientation: S on T}
+\small
+Use a sensor's orientation at each event's \textbf{UTC origin time}, following the
+Haenam rotation workflow. P stays on Z; S is measured exclusively on T.
+\begin{lstlisting}[language=bash]
+./pocketquake.sh catalog.csv myswarm \
+  --orientation-csv orientation.csv --fg
+\end{lstlisting}
+\begin{itemize}
+  \setlength{\itemsep}{1pt}
+  \item Repair in order: swap N/E, then flip N/E, then use
+        $ba=(baz-\theta)\bmod 360$ in ObsPy's N/E-to-R/T rotation.
+        Calibrate $\theta$ after repairs; $baz$ points from station to source.
+  \item \texttt{--rotation-reference LAT,LON}: optional common source point;
+        otherwise each event's coordinates.
+  \item \texttt{--s-on-t} alone uses nominal orientation. Without either option,
+        S keeps the existing best-of-N/E measurement.
+\end{itemize}
+{\footnotesize FDSN inputs already rotated to geographic Z/N/E need only a residual
+correction. Table format and existing-run instructions: \texttt{docs/orientation.md}.}
+\end{frame}
+
+\begin{frame}[fragile]{Orientation epochs and reproducible reruns}
+\small
+Illustrative CSV values (not station calibration data):
+\begin{lstlisting}
+network,station,sensor,start,end,theta_deg
+XX,DEMO,HH,2020-01-01,2020-05-23,120.0
+XX,DEMO,HH,2020-05-24,2020-12-31,10.0
+\end{lstlisting}
+\begin{itemize}
+  \item Match network + station + sensor at each event's UTC origin.
+        Date-only ends include the whole day; timestamp ends are exclusive.
+  \item Missing epoch: \texttt{--orientation-missing error} (default),
+        \texttt{zero} (warn + nominal), or \texttt{skip} (omit T).
+  \item Optional columns: \texttt{location,swap\_ne,flip\_n,flip\_e}.
+        The table's angle must describe the axes after the specified repairs.
+  \item Orientation/component changes invalidate old correlation pairs.
+        Re-run xcorr, dt.cc relocation, and downstream uncertainty/results products.
 \end{itemize}
 \end{frame}
 

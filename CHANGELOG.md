@@ -3,6 +3,26 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.17.0 — 2026-11-22
+
+**Added** (`external/korea-cluster-relocation` → 8fd50a0)
+- **Time-dependent orientation and transverse S correlation.** `--orientation-csv PATH`
+  enables the Haenam-style workflow: select each network/station/sensor's correction at
+  the event's UTC origin, repair horizontal wiring when explicitly configured, rotate
+  with `(back azimuth - misorientation) % 360`, and correlate S exclusively on T while
+  keeping P on Z. `--s-on-t` without a table uses nominal orientation. Default S
+  correlation remains best-of-N/E.
+- `--orientation-missing {error,zero,skip}` makes missing epoch coverage explicit;
+  `--rotation-reference LAT,LON` optionally keeps one source reference for the sequence.
+  Cluster configuration exposes the same choices for external/global waveform sources.
+- An [orientation guide](docs/orientation.md), CLI examples, and tutorial slides document
+  epoch boundaries, wiring repairs, residual corrections for FDSN Z/N/E, and existing runs.
+
+**Changed**
+- Correlation resume and derived-trace caching account for orientation/component changes,
+  preventing reuse of differential times from another correction or component selection.
+  Original Z/N/E records and their phase picks remain available.
+
 ## 1.16.1 — 2026-11-15
 
 **Security**

@@ -49,3 +49,4 @@ You get: relocated epicenter map, three orthogonal depth sections, fault-frame s
 
 - [Two relocation modes](relocation-modes.md) — Fortran vs Python, and `--compare`
 - [CLI reference](cli.md) — `--source`, `--skip-download`, `--velmodel`, `--mainshock`, …
+- [Orientation and S on T](orientation.md) — time-dependent sensor corrections with `--orientation-csv`

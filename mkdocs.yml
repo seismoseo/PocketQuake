@@ -4,7 +4,7 @@ site_url: https://pocketquake.readthedocs.io/
 repo_url: https://github.com/seismoseo/PocketQuake
 repo_name: seismoseo/PocketQuake
 edit_uri: edit/main/docs/
-copyright: PocketQuake v1.16.1 &middot; Made by Min-Seong Seo / SGTL, SNU
+copyright: PocketQuake v1.17.0 &middot; Made by Min-Seong Seo / SGTL, SNU
 
 theme:
   name: material
@@ -52,6 +52,7 @@ nav:
   - Installation: INSTALL.md
   - Two relocation modes: relocation-modes.md
   - CLI reference: cli.md
+  - Orientation and S on T: orientation.md
   - External tools: EXTERNAL_TOOLS.md
   - Python backend: python-backend.md
   - Workflow: workflow.md

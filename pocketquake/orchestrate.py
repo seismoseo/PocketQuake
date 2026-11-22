@@ -213,7 +213,11 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
                 velmodel: str = "kim1983",
                 kigam: bool = False,
                 fetcher=None,
-                spec_extra: dict | None = None) -> dict:
+                spec_extra: dict | None = None,
+                s_on_t: bool = False,
+                orientation_csv: str | None = None,
+                orientation_missing: str = "error",
+                rotation_reference: tuple[float, float] | None = None) -> dict:
     """End-to-end: scaffold → waveform download → register → eq-cycle pipeline → results notebook.
 
     `wf_backend` picks the waveform source:
@@ -266,7 +270,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
         name=cluster, region=region, catalog_csv=catalog_csv,
         epicenter=tuple(epicenter), region_bounds=tuple(region_bounds),
         networks=tuple(networks), dtct_isolv=dtct_isolv, wf_backend=wf_backend,
-        loc_backend=loc_backend, reloc_backend=reloc_backend, **(spec_extra or {}),
+        loc_backend=loc_backend, reloc_backend=reloc_backend,
+        s_on_t=s_on_t, orientation_csv=orientation_csv,
+        orientation_missing=orientation_missing, rotation_reference=rotation_reference,
+        **(spec_extra or {}),
     )
 
     # 1. scaffold + register (idempotent)
@@ -288,6 +295,10 @@ def orchestrate(catalog_csv: str, cluster: str, epicenter: tuple[float, float],
           + (f"  (stp_cutoff={stp_cutoff})" if wf_backend == "mixed" and stp_cutoff else "")
           + ("  + KG from KIGAM Quake" if kigam else ""))
     print(f"[pocketquake] loc_backend:    {loc_backend}    reloc_backend:  {reloc_backend}")
+    if spec.s_on_t:
+        print(f"[pocketquake] cross-correlation: P on Z, S on T; orientation="
+              f"{spec.orientation_csv or 'nominal zero'}; missing={spec.orientation_missing}; "
+              f"source={spec.rotation_reference or 'per-event SAC coordinates'}")
 
     # 2. waveform download
     if not skip_download:
@@ -409,6 +420,14 @@ def main(argv: list[str] | None = None) -> None:
                     help="Relative-relocation backend: hypodd (Fortran ph2dt+hypoDD, default) | "
                          "relocdd_py (Python port, needs the clone via RELOCDD_PY_DIR)")
     ap.add_argument("--no-focal-mechanism", action="store_true", help="Skip the focal_mechanism stage")
+    ap.add_argument("--s-on-t", action="store_true",
+                    help="Cross-correlate S exclusively on transverse T (P stays on Z)")
+    ap.add_argument("--orientation-csv",
+                    help="Time-dependent sensor orientation CSV; implies --s-on-t")
+    ap.add_argument("--orientation-missing", choices=("error", "zero", "skip"), default=None,
+                    help="Missing station/epoch policy with an orientation table (default: error)")
+    ap.add_argument("--rotation-reference", type=lambda s: _parse_pair(s, 2, "--rotation-reference"),
+                    help="Fixed source latitude,longitude for rotation (default: each event)")
     ap.add_argument("--skip-download", action="store_true",
                     help="Skip waveform download (waveforms already exist in the cluster dir)")
     ap.add_argument("--skip-pipeline", action="store_true",
@@ -440,13 +459,20 @@ def main(argv: list[str] | None = None) -> None:
                          "location stage still computes all cfg.velocity_models. Default kim1983.")
     args = ap.parse_args(argv)
 
+    if (not args.s_on_t and not args.orientation_csv
+            and (args.orientation_missing is not None or args.rotation_reference is not None)):
+        ap.error("orientation settings require --s-on-t or --orientation-csv")
     if args.augment:
         # Incremental mode: reuse the existing cluster's config/scaffold; only the new
         # events are downloaded/picked, then the whole cluster is re-relocated.
         bad = [f for f, v in (("--skip-pipeline", args.skip_pipeline),
                               ("--epicenter", args.epicenter),
                               ("--region-bounds", args.region_bounds),
-                              ("--kigam", args.kigam)) if v]
+                              ("--kigam", args.kigam),
+                              ("--s-on-t", args.s_on_t),
+                              ("--orientation-csv", args.orientation_csv),
+                              ("--orientation-missing", args.orientation_missing),
+                              ("--rotation-reference", args.rotation_reference)) if v]
         if bad:
             ap.error(f"--augment reuses the existing cluster config (and its recorded waveform "
                      f"sources); drop {', '.join(bad)}")
@@ -485,6 +511,10 @@ def main(argv: list[str] | None = None) -> None:
         cores=args.cores,
         velmodel=args.velmodel,
         kigam=args.kigam,
+        s_on_t=args.s_on_t,
+        orientation_csv=args.orientation_csv,
+        orientation_missing=args.orientation_missing or "error",
+        rotation_reference=args.rotation_reference,
     )
 
 

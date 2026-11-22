@@ -28,6 +28,10 @@
 | `--velmodel {kim1983\|kim2011}` | velocity model for relocation + focal mechanisms + notebook (default `kim1983`) |
 | `--cores N` | cap xcorr workers (default per-cluster, ~10; lower it on small-RAM boxes) |
 | `--xcorr-backend {obspy\|cctorch_cpu\|cctorch_gpu\|cctorch_gpu_batched}` | dt.cc xcorr kernel (default `cctorch_gpu_batched`; overrides `cfg.xcorr_backend`) |
+| `--s-on-t` | S differential times exclusively on T, P on Z; nominal orientation unless a table is supplied |
+| `--orientation-csv PATH` | time-dependent orientation CSV; implies `--s-on-t` ([format and conventions](orientation.md)) |
+| `--orientation-missing {error\|zero\|skip}` | missing table epoch: stop (default), warn and use 0°, or omit T |
+| `--rotation-reference LAT,LON` | common source point for R/T rotation; default: per-event source coordinates |
 | `--epi LAT,LON` | override the auto-derived epicenter (catalog centroid) |
 | `--bounds LAT0,LAT1,LON0,LON1` | override the auto-derived region (catalog bbox + 0.2°) |
 | `--fg` | run in the foreground (default: background via `nohup`, logs to `<slug>_run.log`) |
@@ -44,6 +48,20 @@ If 0 waveforms are found the run stops with a clear message (often the wrong `--
 ## dt.cc xcorr backend
 
 `--xcorr-backend` selects the dt.cc cross-correlation kernel (overriding `cfg.xcorr_backend`). The default `cctorch_gpu_batched` is a single-process GPU (PyTorch FFT) executor that batches across event-pairs: **bit-exact** to the obspy CPU baseline, memory-safe (VRAM-aware batch sizing + OOM-retry), and **~3× faster** at scale. Without a usable CUDA GPU it **auto-falls-back to `obspy`**, so CPU-only machines are unaffected. The GPU path needs the `pq-gpu` conda env (PyTorch cu128). Other values: `obspy` (CPU baseline), `cctorch_cpu` / `cctorch_gpu` (older per-pair PyTorch paths).
+
+## Time-dependent orientation
+
+```bash
+./pocketquake.sh catalog.csv myswarm --orientation-csv orientation.csv \
+    --rotation-reference 34.6611,126.4049 --fg
+```
+
+The table selects a correction by network, station, sensor, and event origin time in UTC.
+The source reference is optional. `--s-on-t` without a table uses nominal N/E orientation;
+the default without either option keeps S on best-of-N/E. The same flags are available in
+`python -m pocketquake.orchestrate` (which uses `--cluster`, `--epicenter`, and
+`--region-bounds` for cluster setup). See the [orientation guide](orientation.md) before
+changing an existing run or applying residual corrections to global FDSN data.
 
 ## Velocity model
 
