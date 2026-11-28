@@ -3,6 +3,23 @@
 Versioning follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads it via setuptools dynamic.
 
+## 1.18.0 — 2026-11-28
+
+**Added** (`external/korea-cluster-relocation` → 102fc51)
+- **Several velocity models per HYPOINVERSE run.** A velocity model can carry its own HYPOINVERSE
+  model commands (`hyp_lines`, with the files they read in `hyp_files`) instead of the default
+  CRH P/S pair, e.g. a network's primary model plus an alternate model for the stations across a
+  fault (`CRT`/`DEL`/`PSM`/`ALT`), and further SKHASH takeoff models (`takeoff_rows`).
+  PocketQuake-global uses it for NCSN's own Bear Valley setup (`--velmodel ncsn:gab`).
+- `global_cluster(..., xcorr_pair_overrides=...)`: the onset window for the larger events in
+  clusters built from FDSN data (PocketQuake-global `--onset-mag`).
+- `XCORR_VRAM_FRACTION` / `XCORR_VRAM_CAP`: GPU memory limits of the batched cross-correlation
+  (defaults 0.4 of the free memory per batch, 0.9 of the card), for a GPU shared with other jobs.
+
+**Unchanged**: with the new fields empty (every Korean cluster), the HYPOINVERSE command text and
+the SKHASH control file are byte for byte the same; all 289 committed cluster configurations and
+their 587 HYPOINVERSE command texts were compared with 1.17.0.
+
 ## 1.17.0 — 2026-11-22
 
 **Added** (`external/korea-cluster-relocation` → 8fd50a0)
