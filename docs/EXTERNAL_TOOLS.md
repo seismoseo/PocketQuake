@@ -18,7 +18,7 @@ only install **one** relocation mode's tools.
 | `mseed2sac` | **both modes** — NECIS → SAC | IRIS source build | on `$PATH` |
 | `bsdtar` | **both modes** — multi-part ZIP from NECIS | `conda install -c conda-forge libarchive` (in `environment.yml`) | on `$PATH` |
 | `hyp1.40` (HypoInverse-2000) | **Fortran mode** — absolute location | USGS source build | on `$PATH` |
-| `ph2dt` + `hypoDD` | **Fortran mode** — relocation | Waldhauser source build | on `$PATH` |
+| `ph2dt` + `hypoDD` + `ncsn2pha` | **Fortran mode** — relocation (`ncsn2pha` converts HYPOINVERSE output for ph2dt) | Waldhauser source build | on `$PATH` |
 | **relocDD-py** | **Python mode** (`--python`) — relocation | `git clone` (steps below) | `RELOCDD_PY_DIR` env var |
 | **HypoSVI + EikoNet** | **Python mode** (`--python`) — location | `git clone` ×2 + `fetch_eikonet` weights | `HYPOSVI_DIR`, `EIKONET_DIR` env vars |
 | `stp-client.pl` | only `--source stp` / `mixed` | contact SGTL lab @ SNU | `STP_PERL_SCRIPT` env var or on `$PATH` |
@@ -41,7 +41,7 @@ If you want a minimum-viable run without focal mechanisms, see [INSTALL.md](INST
   ```
 - Verify: `hyp1.40` prints its banner.
 
-### HypoDD utilities (`ph2dt` + `hypoDD`)
+### HypoDD utilities (`ph2dt` + `hypoDD` + `ncsn2pha`)
 
 - Source: <https://www.ldeo.columbia.edu/~felixw/hypoDD.html>
   (Felix Waldhauser's HypoDD distribution; also mirrored at
@@ -49,11 +49,11 @@ If you want a minimum-viable run without focal mechanisms, see [INSTALL.md](INST
 - Build:
   ```bash
   tar xf HYPODD_1.3.tar.gz && cd HYPODD/src
-  # edit src/hypoDD/Makefile if your gfortran is non-standard
+  # edit hypoDD/Makefile if your gfortran is non-standard
   make
-  cp HYPODD/src/hypoDD/hypoDD HYPODD/src/ph2dt/ph2dt ~/bin/
+  cp hypoDD/hypoDD ph2dt/ph2dt ncsn2pha/ncsn2pha ~/bin/    # somewhere on $PATH
   ```
-- Verify: `which hypoDD ph2dt` returns both paths.
+- Verify: `which hypoDD ph2dt ncsn2pha` returns all three paths.
 
 ### mseed2sac
 
