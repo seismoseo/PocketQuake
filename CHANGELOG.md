@@ -5,7 +5,7 @@ The single source of truth is `pocketquake.__version__`; `pyproject.toml` reads 
 
 ## 1.18.0 — 2026-11-28
 
-**Added** (`external/korea-cluster-relocation` → 102fc51)
+**Added** (`external/korea-cluster-relocation` → 99b1b2d, the merge of its pull request #4)
 - **Several velocity models per HYPOINVERSE run.** A velocity model can carry its own HYPOINVERSE
   model commands (`hyp_lines`, with the files they read in `hyp_files`) instead of the default
   CRH P/S pair, e.g. a network's primary model plus an alternate model for the stations across a
